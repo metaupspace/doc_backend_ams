@@ -1,6 +1,5 @@
-import { generateDocumentPaths } from './routes/generateDocument.routes.ts';
-import { healthPath } from './routes/health.route.ts';
-import { documentsPath } from './routes/documents.route.ts';
+import { healthPath, generateDocumentPaths, documentsPath } from './routes/index.ts';
+import { swaggerComponents } from './components.ts';
 
 export const swaggerDefinition = {
   openapi: '3.0.3',
@@ -16,33 +15,7 @@ export const swaggerDefinition = {
       description: 'Local development',
     },
   ],
-  components: {
-    securitySchemes: {
-      bearerAuth: {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-      },
-    },
-    schemas: {
-      ErrorResponse: {
-        type: 'object',
-        properties: {
-          status: { type: 'string', example: 'error' },
-          message: { type: 'string' },
-          code: { type: 'string' },
-        },
-      },
-      SuccessResponse: {
-        type: 'object',
-        properties: {
-          status: { type: 'string', example: 'success' },
-          message: { type: 'string' },
-          data: { type: 'object', nullable: true },
-        },
-      },
-    },
-  },
+  components: swaggerComponents,
   paths: {
     ...healthPath,
     ...generateDocumentPaths,

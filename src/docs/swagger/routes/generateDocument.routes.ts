@@ -1,4 +1,4 @@
-import { genericExampleForType } from '../examples/documentExamples.ts';
+import { genericExampleForType } from '../examples/index.ts';
 
 const GENERATOR_DOCUMENT_ROUTES = [
   {

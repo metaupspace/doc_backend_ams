@@ -2,8 +2,10 @@ import Joi from 'joi';
 import {
   CONTRACTUAL_LETTER_DEFAULT_PARAGRAPHS,
   CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL,
+  LETTER_OF_INTENT_DEFAULT_INTRO_PARAGRAPHS,
   LETTER_OF_INTENT_DEFAULT_PARAGRAPHS,
-  OFFER_LETTER_DEFAULT_PARAGRAPHS,
+  INTERNSHIP_OFFER_LETTER_DEFAULT_INTRO_PARAGRAPH,
+  INTERNSHIP_OFFER_LETTER_DEFAULT_PARAGRAPHS,
   INTERNSHIP_COMPLETION_CERTIFICATE_DEFAULT_PARAGRAPHS,
   INTERNSHIP_TO_FULL_TIME_LETTER_DEFAULT_PARAGRAPHS,
   JOINING_LETTER_DEFAULT_PARAGRAPHS,
@@ -86,28 +88,56 @@ export const validateDocumentRequest = (documentType, data): any => {
 
   if (documentType === 'letter-of-intent') {
     const p = result.value.payload;
+    const introParagraphsFromArray = Array.isArray(p.introParagraphs)
+      ? p.introParagraphs.filter(Boolean)
+      : [];
+    const introParagraphsFromFields = [p.introParagraph1, p.introParagraph2].filter(Boolean);
+    const introParagraphsFromText =
+      typeof p.introParagraph === 'string' && p.introParagraph.trim()
+        ? p.introParagraph
+            .split(/(?<=[.!?])\s+(?=[A-Z])/)
+            .map((paragraph) => paragraph.trim())
+            .filter(Boolean)
+            .slice(0, 2)
+        : [];
+
+    const inputIntroParagraphs =
+      introParagraphsFromArray.length > 0
+        ? introParagraphsFromArray.slice(0, 2)
+        : introParagraphsFromFields.length > 0
+          ? introParagraphsFromFields.slice(0, 2)
+          : introParagraphsFromText;
+
     const inputParagraphs = Array.isArray(p.paragraphs)
       ? p.paragraphs.filter(Boolean)
       : [p.paragraph1, p.paragraph2, p.paragraph3].filter(Boolean);
 
+    p.introParagraphs =
+      inputIntroParagraphs.length > 0
+        ? inputIntroParagraphs.slice(0, 2)
+        : [...LETTER_OF_INTENT_DEFAULT_INTRO_PARAGRAPHS];
+
     p.paragraphs =
-      inputParagraphs.length > 0 ? inputParagraphs : [...LETTER_OF_INTENT_DEFAULT_PARAGRAPHS];
+      inputParagraphs.length > 0
+        ? inputParagraphs.slice(0, 2)
+        : [...LETTER_OF_INTENT_DEFAULT_PARAGRAPHS].slice(0, 2);
     p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
     p.signatoryName = p.signatoryName || 'Authorized Signatory';
     p.position = p.position || 'Position';
   }
 
-  if (documentType === 'offer-letter') {
+  if (documentType === 'internship-offer-letter') {
     const p = result.value.payload;
     const inputParagraphs = Array.isArray(p.paragraphs)
       ? p.paragraphs.filter(Boolean)
       : [p.paragraph1, p.paragraph2, p.paragraph3, p.paragraph4].filter(Boolean);
 
     p.paragraphs =
-      inputParagraphs.length > 0 ? inputParagraphs : [...OFFER_LETTER_DEFAULT_PARAGRAPHS];
+      inputParagraphs.length > 0 ? inputParagraphs : [...INTERNSHIP_OFFER_LETTER_DEFAULT_PARAGRAPHS];
+    p.introParagraph = p.introParagraph || INTERNSHIP_OFFER_LETTER_DEFAULT_INTRO_PARAGRAPH;
     p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
-    p.signatoryName = p.signatoryName || 'Authorized Signatory';
-    p.position = p.position || 'Position';
+    p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
+    p.position = p.position || 'CEO & Founder';
   }
 
   if (documentType === 'probation-completion-letter') {
@@ -226,6 +256,20 @@ export const validateDocumentRequest = (documentType, data): any => {
     p.rightSignatoryCompany = p.rightSignatoryCompany || p.companyName;
   }
 
+  if (documentType === 'internship-to-full-time-letter') {
+    const p = result.value.payload;
+    const inputParagraphs = Array.isArray(p.paragraphs)
+      ? p.paragraphs.filter(Boolean)
+      : [p.paragraph1, p.paragraph2, p.paragraph3, p.paragraph4].filter(Boolean);
+
+    p.paragraphs =
+      inputParagraphs.length > 0 ? inputParagraphs : [...INTERNSHIP_TO_FULL_TIME_LETTER_DEFAULT_PARAGRAPHS];
+    p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
+    p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
+    p.position = p.position || 'CEO & Founder';
+    p.signatoryCompany = p.signatoryCompany || 'MetaUpSpace LLP';
+  }
+
   if (documentType === 'experience-letter') {
     const p = result.value.payload;
     const inputParagraphs = Array.isArray(p.paragraphs)
@@ -241,6 +285,19 @@ export const validateDocumentRequest = (documentType, data): any => {
     p.title = p.title || 'WORK EXPERIENCE LETTER';
     p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
     p.position = p.position || 'CEO & Founder';
+  }
+
+  if (documentType === 'joining-letter') {
+    const p = result.value.payload;
+    const inputParagraphs = Array.isArray(p.paragraphs)
+      ? p.paragraphs.filter(Boolean)
+      : [p.paragraph1, p.paragraph2, p.paragraph3].filter(Boolean);
+
+    p.paragraphs = inputParagraphs.length > 0 ? inputParagraphs : [...JOINING_LETTER_DEFAULT_PARAGRAPHS];
+    p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
+    p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
+    p.position = p.position || 'CEO & Founder';
+    p.signatoryCompany = p.signatoryCompany || 'MetaUpSpace LLP';
   }
 
   if (documentType === 'promotion-letter') {

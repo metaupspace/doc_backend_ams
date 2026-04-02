@@ -5,7 +5,7 @@ import { jwtUtils } from '../utils/jwtUtils.ts';
  * List of public endpoints that don't require authentication
  * Similar to Spring Boot's AUTH_WHITELIST
  */
-const PUBLIC_ROUTES = ['/health', '/api/health', '/api/v1/health', '/api-docs', '/openapi.tson'];
+const PUBLIC_ROUTES = ['/health', '/api/health', '/api/v1/health', '/api-docs', '/openapi.json'];
 
 /**
  * Check if request path is in public routes
@@ -38,7 +38,7 @@ export const validateToken = (req, res, next) => {
         method: req.method,
         ip: req.ip,
       });
-      return res.status(401).tson({
+      return res.status(401).json({
         status: 'error',
         message: 'Missing Authorization header',
         code: 'MISSING_TOKEN',
@@ -52,7 +52,7 @@ export const validateToken = (req, res, next) => {
         method: req.method,
         received: authHeader.substring(0, 20),
       });
-      return res.status(401).tson({
+      return res.status(401).json({
         status: 'error',
         message: 'Invalid Authorization format. Use Bearer <token>',
         code: 'INVALID_BEARER_FORMAT',
@@ -67,7 +67,7 @@ export const validateToken = (req, res, next) => {
         path: req.path,
         method: req.method,
       });
-      return res.status(401).tson({
+      return res.status(401).json({
         status: 'error',
         message: 'Token cannot be empty',
         code: 'EMPTY_TOKEN',
@@ -81,7 +81,7 @@ export const validateToken = (req, res, next) => {
         method: req.method,
         ip: req.ip,
       });
-      return res.status(401).tson({
+      return res.status(401).json({
         status: 'error',
         message: 'Invalid or expired token',
         code: 'INVALID_TOKEN',
@@ -95,7 +95,7 @@ export const validateToken = (req, res, next) => {
         path: req.path,
         method: req.method,
       });
-      return res.status(401).tson({
+      return res.status(401).json({
         status: 'error',
         message: 'Invalid token payload',
         code: 'INVALID_PAYLOAD',
@@ -122,7 +122,7 @@ export const validateToken = (req, res, next) => {
       method: req.method,
     });
 
-    return res.status(500).tson({
+    return res.status(500).json({
       status: 'error',
       message: 'Authentication error',
       code: 'AUTH_ERROR',
@@ -137,7 +137,7 @@ export const validateToken = (req, res, next) => {
 export const requireRoles = (allowedRoles = []) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).tson({
+      return res.status(401).json({
         status: 'error',
         message: 'Unauthorized',
         code: 'UNAUTHORIZED',
@@ -154,7 +154,7 @@ export const requireRoles = (allowedRoles = []) => {
         userRoles,
       });
 
-      return res.status(403).tson({
+      return res.status(403).json({
         status: 'error',
         message: 'Insufficient permissions',
         code: 'FORBIDDEN',

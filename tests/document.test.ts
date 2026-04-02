@@ -83,7 +83,7 @@ test('GET /health - should return 200 OK', async () => {
 
   try {
     const res = await fetch(`http://127.0.0.1:${port}/health`);
-    const json = await res.tson();
+    const json = await res.json();
 
     assert.equal(res.status, 200, 'Should return 200 status');
     assert.equal(json.status, 'ok', 'Should return ok status');
@@ -99,7 +99,7 @@ test('GET /unknown under /api - should return 404', async () => {
 
   try {
     const res = await fetch(`http://127.0.0.1:${port}/api/unknown`);
-    const json = await res.tson();
+    const json = await res.json();
 
     assert.equal(res.status, 404, 'Should return 404 status');
     assert.equal(json.status, 'error', 'Should return error status');

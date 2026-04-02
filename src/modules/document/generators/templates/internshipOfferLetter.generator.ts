@@ -4,7 +4,8 @@ import { PDFDocument } from 'pdf-lib';
 import { COMPANY_NAME } from '../../config/commonDetail.config.ts';
 import {
   CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL,
-  PROBATION_COMPLETION_LETTER_DEFAULT_PARAGRAPHS,
+  INTERNSHIP_OFFER_LETTER_DEFAULT_INTRO_PARAGRAPH,
+  INTERNSHIP_OFFER_LETTER_DEFAULT_PARAGRAPHS,
 } from '../../config/document.config.ts';
 import { LETTER_LAYOUT } from '../../config/letterLayout.config.ts';
 import { TYPOGRAPHY } from '../../config/typography.config.ts';
@@ -16,7 +17,7 @@ import { drawBulletLabelValue, drawSimpleLine } from '../../utils/pdfLineLayout.
 import { drawRichParagraph, textWidth } from '../../utils/pdfTextLayout.util.ts';
 import { normalizeParagraphsWithDefaults } from '../../utils/paragraphs.util.ts';
 
-export const generateProbationCompletionLetterPdfBuffer = async (
+export const generateInternshipOfferLetterPdfBuffer = async (
   payload,
   { issuedAt } = { issuedAt: undefined }
 ) => {
@@ -86,7 +87,7 @@ export const generateProbationCompletionLetterPdfBuffer = async (
       },
     });
 
-  const title = payload.title || 'PROBATION COMPLETION LETTER';
+  const title = payload.title || 'INTERNSHIP OFFER LETTER';
   const titleWidth = textWidth(boldFont, title, TYPOGRAPHY.heading1.size);
   await ensureSpace(58);
   page.drawText(title, {
@@ -97,9 +98,9 @@ export const generateProbationCompletionLetterPdfBuffer = async (
   });
   y -= 40;
 
-  const issueText = formatIssueDate(payload.issueDate || issuedAt);
-  const issueWidth = textWidth(boldFont, issueText, TYPOGRAPHY.bodyHighlighted.size);
-  page.drawText(issueText, {
+  const issueLabel = formatIssueDate(payload.issueDate || issuedAt);
+  const issueWidth = textWidth(boldFont, issueLabel, TYPOGRAPHY.bodyHighlighted.size);
+  page.drawText(issueLabel, {
     x: rightX - issueWidth,
     y,
     size: TYPOGRAPHY.bodyHighlighted.size,
@@ -108,7 +109,7 @@ export const generateProbationCompletionLetterPdfBuffer = async (
   y -= 30;
 
   await drawSimpleLine({
-    text: `Dear ${payload.employeeName || `Candidate's Name`},`,
+    text: payload.greeting || `Dear ${payload.employeeName || 'Employee'},`,
     font: boldFont,
     size: TYPOGRAPHY.bodyHighlighted.size,
     leftX,
@@ -122,7 +123,9 @@ export const generateProbationCompletionLetterPdfBuffer = async (
       ensureSpace,
     },
   });
+
   y -= 2;
+
   await drawSimpleLine({
     text: 'Congratulations!',
     font: boldFont,
@@ -140,20 +143,23 @@ export const generateProbationCompletionLetterPdfBuffer = async (
     },
   });
 
+  const companyName = payload.companyName || COMPANY_NAME;
   const introParagraph =
     typeof payload.introParagraph === 'string' && payload.introParagraph.trim()
       ? payload.introParagraph.trim()
-      : `We are pleased to inform you that you have successfully completed your probationary period at ${
-          payload.companyName || COMPANY_NAME
-        }, which commenced on ${
-          payload.probationStartDate || '[Probation Start Date]'
-        } and concluded on ${
-          payload.probationEndDate || '[Probation End Date]'
-        }. Based on a thorough evaluation of your performance, conduct, and alignment with the role's expectations, we are satisfied with your contributions and professionalism during this period.`;
+      : INTERNSHIP_OFFER_LETTER_DEFAULT_INTRO_PARAGRAPH.replace(
+          '[Position Title]',
+          payload.positionTitle || payload.designation || payload.jobTitle || 'Intern'
+        );
 
   await drawParagraph(introParagraph);
+
+  const keyDetailsTitle =
+    typeof payload.keyDetailsTitle === 'string' && payload.keyDetailsTitle.trim()
+      ? payload.keyDetailsTitle.trim()
+      : 'Please find below the key details of your internship engagement:';
   await drawSimpleLine({
-    text: payload.keyDetailsTitle || 'Below are the key details of your employment confirmation:',
+    text: keyDetailsTitle,
     font: regularFont,
     size: TYPOGRAPHY.body.size,
     leftX,
@@ -167,25 +173,27 @@ export const generateProbationCompletionLetterPdfBuffer = async (
       ensureSpace,
     },
   });
-  y -= 2;
 
   const keyTerms = [
-    { label: 'Probation Start Date', value: payload.probationStartDate, bold: false },
-    { label: 'Probation End Date', value: payload.probationEndDate, bold: false },
-    { label: 'Confirmation Effective Date', value: payload.confirmationEffectiveDate, bold: false },
-    { label: 'Job Title', value: payload.jobTitle || payload.designation, bold: false },
-    { label: 'Department', value: payload.department, bold: false },
-    { label: 'Reporting Manager', value: payload.reportingManager, bold: false },
-    { label: 'Work Schedule', value: payload.workSchedule, bold: false },
-    { label: 'Work Location', value: payload.workLocation || payload.location, bold: false },
-    { label: 'Stipend', value: payload.stipend, bold: false },
-    { label: 'Expected Start Date', value: payload.expectedStartDate, bold: false },
+    {
+      label: 'Position Title',
+      value: payload.positionTitle || payload.designation || payload.jobTitle,
+      bold: true,
+    },
+    { label: 'Department', value: payload.department, bold: true },
+    { label: 'Reporting Manager', value: payload.reportingManager, bold: true },
+    { label: 'Internship Duration', value: payload.internshipDuration, bold: true },
+    { label: 'Work Schedule', value: payload.workSchedule, bold: true },
+    { label: 'Work Location', value: payload.workLocation || payload.location, bold: true },
+    { label: 'Stipend', value: payload.stipend || payload.compensation, bold: true },
+    { label: 'Acceptance Deadline', value: payload.acceptanceDeadline, bold: true },
   ];
 
   for (const term of keyTerms) {
     if (term.value === undefined || term.value === null || String(term.value).trim() === '') {
       continue;
     }
+
     await drawBulletLabelValue({
       label: term.label,
       value: term.value,
@@ -212,29 +220,17 @@ export const generateProbationCompletionLetterPdfBuffer = async (
 
   const paragraphs = normalizeParagraphsWithDefaults(
     payload,
-    PROBATION_COMPLETION_LETTER_DEFAULT_PARAGRAPHS
+    INTERNSHIP_OFFER_LETTER_DEFAULT_PARAGRAPHS
   );
+
   for (const paragraph of paragraphs) {
     await drawParagraph(paragraph);
   }
 
-  y -= 2;
-  await drawSimpleLine({
-    text: payload.closingText || 'Sincerely,',
-    font: boldFont,
-    size: TYPOGRAPHY.bodyHighlighted.size,
-    leftX,
-    lineGap: TYPOGRAPHY.body.lineGap,
-    pageAccess: {
-      getPage: () => page,
-      getY: () => y,
-      setY: (nextY) => {
-        y = nextY;
-      },
-      ensureSpace,
-    },
-  });
-  y -= 24;
+  const contactParagraph = typeof payload.contactParagraph === 'string' ? payload.contactParagraph.trim() : '';
+  if (contactParagraph) {
+    await drawParagraph(contactParagraph);
+  }
 
   const signatureImage = await loadSignatureImage(
     pdfDoc,
@@ -266,6 +262,25 @@ export const generateProbationCompletionLetterPdfBuffer = async (
 
   await ensureSpace(signatureBlockHeight);
 
+  y -= 2;
+  await drawSimpleLine({
+    text: payload.closingText || 'Warm Regards,',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
+
+  y -= signatureLeadGap;
+
   if (signatureImage) {
     const maxWidth = LETTER_LAYOUT.signatureImage.maxWidth;
     const maxHeight = LETTER_LAYOUT.signatureImage.maxHeight;
@@ -283,7 +298,7 @@ export const generateProbationCompletionLetterPdfBuffer = async (
   }
 
   await drawSimpleLine({
-    text: payload.signatoryName || 'Authorized Signatory',
+    text: payload.signatoryName || 'Sahil Jaiswal',
     font: boldFont,
     size: TYPOGRAPHY.bodyHighlighted.size,
     leftX,
@@ -297,8 +312,9 @@ export const generateProbationCompletionLetterPdfBuffer = async (
       ensureSpace,
     },
   });
+
   await drawSimpleLine({
-    text: payload.position || 'Position',
+    text: payload.position || 'CEO & Founder',
     font: regularFont,
     size: TYPOGRAPHY.body.size,
     leftX,
@@ -312,8 +328,9 @@ export const generateProbationCompletionLetterPdfBuffer = async (
       ensureSpace,
     },
   });
+
   await drawSimpleLine({
-    text: payload.companyName || COMPANY_NAME,
+    text: payload.companyName || companyName,
     font: boldFont,
     size: TYPOGRAPHY.bodyHighlighted.size,
     leftX,

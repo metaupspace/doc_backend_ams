@@ -14,9 +14,12 @@ export const PROBATION_OFFER_LETTER_DEFAULT_PARAGRAPHS = [
   'To confirm your acceptance of this offer, please sign and date the acceptance section below and return a scanned copy of this letter, along with all the attached annexures to the email address mentioned below by the stated acceptance deadline.',
 ];
 
-export const OFFER_LETTER_DEFAULT_PARAGRAPHS = [
-  "As a full-time employee at MetaUpSpace LLP, you will support ongoing tasks and initiatives within your department. Your responsibilities will contribute meaningfully to the company's broader objectives while providing you with practical exposure and an opportunity for professional development.",
-  'Please review the detailed terms and conditions of this employment offer outlined in the attached annexures. Note that this offer may be contingent upon signing our standard Non-Disclosure Agreement (NDA) to protect company and client information.',
+export const INTERNSHIP_OFFER_LETTER_DEFAULT_INTRO_PARAGRAPH =
+  'We are pleased to extend to you an offer to join MetaUpSpace LLP as a [Position Title] Intern. Following our recent discussions and your performance during the selection process, we believe you possess the qualities that align with the values and expectations of our organization.';
+
+export const INTERNSHIP_OFFER_LETTER_DEFAULT_PARAGRAPHS = [
+  'As an intern at MetaUpSpace LLP, you will support ongoing tasks and initiatives within your department. Your responsibilities will contribute meaningfully to the company’s broader objectives while providing you with practical exposure and an opportunity for professional development.',
+  'Please review the detailed terms and conditions of this internship offer outlined in the attached annexures. Note that this offer may be contingent upon signing our standard Non-Disclosure Agreement (NDA) to protect company and client information.',
   'To confirm your acceptance of this offer, please sign and date the acceptance section below and return a scanned copy of this letter, along with all the attached annexures to the email address mentioned below by the stated acceptance deadline.',
   'We are building something special here at MetaUpSpace LLP, and we believe you have the potential to make a real contribution during your journey with our team. We look forward to the possibility of you joining our team!',
 ];
@@ -33,6 +36,11 @@ export const WORK_EXPERIENCE_LETTER_DEFAULT_PARAGRAPHS = [
 export const PROMOTION_LETTER_DEFAULT_PARAGRAPHS = [
   'In line with this new role, your compensation and responsibilities will be revised effective from the stated date. All other terms and conditions of your employment remain unchanged unless otherwise communicated by the company.',
   'We are confident that you will continue to demonstrate professionalism, initiative, and leadership in this elevated position. We congratulate you on this advancement and look forward to your continued contributions.',
+];
+
+export const LETTER_OF_INTENT_DEFAULT_INTRO_PARAGRAPHS = [
+  'We are pleased to express our intent to engage you as a member of the MetaUpSpace LLP team.',
+  'Based on your past performance and our recent discussions, we believe you can make valuable contributions to our team and organizational goals.',
 ];
 
 export const JOINING_LETTER_DEFAULT_PARAGRAPHS = [
@@ -73,7 +81,6 @@ export const PROBATION_COMPLETION_LETTER_DEFAULT_PARAGRAPHS = [
 ];
 
 export const LETTER_OF_INTENT_DEFAULT_PARAGRAPHS = [
-  'This Letter of Intent (LOI) serves as a formal indication of our interest in continuing your engagement with MetaUpSpace LLP under the terms discussed. Kindly note that this is not a legally binding offer of employment. A detailed offer letter will be shared separately, subject to successful completion of internal approvals, background verification, and submission of necessary documents.',
   "At the time of on-boarding, you will be expected to review and formally acknowledge adherence to company's standard policies, including but not limited to the Confidentiality Agreement, Code of Conduct, and IT Usage Policy.",
   'We are excited about the possibility of you joining our team and look forward to a positive response. Should you have any questions or require further clarification, please feel free to reach us out at hr@metaupspace.com.',
 ];
@@ -153,9 +160,23 @@ export const DOCUMENT_SPECIFICATIONS = {
     title: 'Contractual Letter',
     requiredFields: ['employeeName', 'paragraphs', 'signatureUrl', 'signatoryName', 'position'],
   },
-  'offer-letter': {
-    title: 'Offer Letter',
-    requiredFields: ['employeeName', 'paragraphs', 'signatureUrl', 'signatoryName', 'position'],
+  'internship-offer-letter': {
+    title: 'Internship Offer Letter',
+    requiredFields: [
+      'employeeName',
+      'positionTitle',
+      'department',
+      'reportingManager',
+      'internshipDuration',
+      'workSchedule',
+      'workLocation',
+      'stipend',
+      'acceptanceDeadline',
+      'paragraphs',
+      'signatureUrl',
+      'signatoryName',
+      'position',
+    ],
   },
   'appointment-letter': {
     title: 'Appointment Letter',
@@ -238,6 +259,7 @@ export const DOCUMENT_SPECIFICATIONS = {
       'department',
       'joiningDate',
       'reportingManagerName',
+      'signatureUrl',
       'paragraphs',
     ],
   },
@@ -249,6 +271,7 @@ export const DOCUMENT_SPECIFICATIONS = {
       'positionTitle',
       'department',
       'expectedStartDate',
+      'signatureUrl',
       'paragraphs',
     ],
   },
@@ -288,4 +311,4 @@ export const isPerformanceReport = (documentType) => documentType === 'performan
 export const shouldSkipEmployeeExistenceCheck = (documentType) =>
   documentType === 'contractual-letter' ||
   documentType === 'probation-offer-letter' ||
-  documentType === 'offer-letter';
+  documentType === 'internship-offer-letter';

@@ -5,130 +5,11 @@ import { TYPOGRAPHY } from '../../config/typography.config.ts';
 import { embedDMSansFonts } from '../../utils/fontLoader.util.ts';
 import { COMPANY_NAME } from '../../config/commonDetail.config.ts';
 import { formatIssueDate } from '../../utils/formatIssueDate.util.ts';
-import { decodeHtmlEntities } from '../../utils/decodeHtmlEntities.util.ts';
-
-const normalizeParagraphs = (payload) => {
-  if (Array.isArray(payload.paragraphs)) {
-    return payload.paragraphs.filter(Boolean).slice(0, 3);
-  }
-
-  return [payload.paragraph1, payload.paragraph2, payload.paragraph3].filter(Boolean);
-};
-
-const parseRichText = (htmlLikeText) => {
-  const input = String(htmlLikeText || '');
-  const parts = input.split(/(<[^>]+>)/g).filter(Boolean);
-  const tokens = [];
-
-  const style = {
-    bold: false,
-    italic: false,
-    underline: false,
-  };
-
-  const pushText = (value) => {
-    const decoded = decodeHtmlEntities(value);
-    if (!decoded) return;
-    tokens.push({
-      type: 'text',
-      text: decoded,
-      style: {
-        bold: style.bold,
-        italic: style.italic,
-        underline: style.underline,
-      },
-    });
-  };
-
-  for (const part of parts) {
-    if (!part.startsWith('<')) {
-      pushText(part);
-      continue;
-    }
-
-    const tag = part.toLowerCase().replace(/\s+/g, '');
-    if (tag === '<br>' || tag === '<br/>' || tag === '<br/ >') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-
-    if (tag === '<p>' || tag === '<div>') {
-      continue;
-    }
-
-    if (tag === '</p>' || tag === '</div>') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-
-    if (tag === '<li>') {
-      pushText('• ');
-      continue;
-    }
-
-    if (tag === '</li>') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-
-    if (tag === '<b>' || tag === '<strong>') {
-      style.bold = true;
-      continue;
-    }
-
-    if (tag === '</b>' || tag === '</strong>') {
-      style.bold = false;
-      continue;
-    }
-
-    if (tag === '<i>' || tag === '<em>') {
-      style.italic = true;
-      continue;
-    }
-
-    if (tag === '</i>' || tag === '</em>') {
-      style.italic = false;
-      continue;
-    }
-
-    if (tag === '<u>') {
-      style.underline = true;
-      continue;
-    }
-
-    if (tag === '</u>') {
-      style.underline = false;
-      continue;
-    }
-  }
-
-  return tokens;
-};
-
-const textWidth = (font, text, size) => font.widthOfTextAtSize(text, size);
-
-const loadSignatureImage = async (pdfDoc, signatureUrl) => {
-  if (!signatureUrl || typeof signatureUrl !== 'string') {
-    return null;
-  }
-
-  try {
-    const response = await fetch(signatureUrl);
-    if (!response.ok) return null;
-    const imageBytes = await response.arrayBuffer();
-    const contentType = response.headers.get('content-type') || '';
-
-    if (contentType.includes('png')) {
-      return pdfDoc.embedPng(imageBytes);
-    }
-    if (contentType.includes('jpeg') || contentType.includes('jpg')) {
-      return pdfDoc.embedJpg(imageBytes);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-};
+import { parseRichText } from '../../utils/parseRichText.util.ts';
+import { loadSignatureImage } from '../../utils/loadSignatureImage.util.ts';
+import { drawRichParagraph, textWidth } from '../../utils/pdfTextLayout.util.ts';
+import { normalizeParagraphList } from '../../utils/paragraphs.util.ts';
+import { LETTER_LAYOUT } from '../../config/letterLayout.config.ts';
 
 export const generateAppraisalLetterPdfBuffer = async (
   payload,
@@ -151,11 +32,11 @@ export const generateAppraisalLetterPdfBuffer = async (
   const helveticaBoldItalic = fonts.boldItalic;
 
   const pageWidth = page.getWidth();
-  const topY = page.getHeight() - 160; // keep safe-zone under letterhead banner
-  const leftX = 48;
-  const rightX = pageWidth - 48;
+  const topY = page.getHeight() - LETTER_LAYOUT.topOffset; // keep safe-zone under letterhead banner
+  const leftX = LETTER_LAYOUT.sidePadding;
+  const rightX = pageWidth - LETTER_LAYOUT.sidePadding;
   const contentWidth = rightX - leftX;
-  const minY = 96; // keep safe-zone above footer graphics but avoid early pagination
+  const minY = LETTER_LAYOUT.minY; // keep safe-zone above footer graphics but avoid early pagination
 
   let y = topY;
 
@@ -176,112 +57,31 @@ export const generateAppraisalLetterPdfBuffer = async (
     font = helvetica,
     size = TYPOGRAPHY.body.size,
     lineGap = TYPOGRAPHY.body.lineGap
-  ) => {
-    const lineHeight = size + lineGap;
-    const tokens = parseRichText(text);
-    const currentLine = [];
-    let currentLineWidth = 0;
-
-    const fontForStyle = (styleInfo) => {
-      if (styleInfo.bold && styleInfo.italic) return helveticaBoldItalic;
-      if (styleInfo.bold) return helveticaBold;
-      if (styleInfo.italic) return helveticaItalic;
-      return font;
-    };
-
-    const drawLine = async () => {
-      if (currentLine.length === 0) return;
-
-      await ensureSpace(lineHeight);
-      let cursorX = leftX;
-
-      for (const segment of currentLine) {
-        const segmentFont = fontForStyle(segment.style);
-        const segmentWidth = textWidth(segmentFont, segment.text, size);
-
-        page.drawText(segment.text, {
-          x: cursorX,
-          y,
-          size,
-          font: segmentFont,
-        });
-
-        if (segment.style.underline) {
-          page.drawLine({
-            start: { x: cursorX, y: y - 1.5 },
-            end: { x: cursorX + segmentWidth, y: y - 1.5 },
-            thickness: 0.8,
-          });
-        }
-
-        cursorX += segmentWidth;
-      }
-
-      currentLine.length = 0;
-      currentLineWidth = 0;
-      y -= lineHeight;
-    };
-
-    const pushChunk = async (chunk, styleInfo) => {
-      if (!chunk) return;
-      if (/^\s+$/.test(chunk) && currentLine.length === 0) return;
-
-      const chunkFont = fontForStyle(styleInfo);
-      const chunkWidth = textWidth(chunkFont, chunk, size);
-
-      if (
-        !/^\s+$/.test(chunk) &&
-        currentLineWidth + chunkWidth > contentWidth &&
-        currentLine.length > 0
-      ) {
-        await drawLine();
-      }
-
-      // If a single chunk is still too long, split by characters.
-      if (!/^\s+$/.test(chunk) && chunkWidth > contentWidth) {
-        let buffer = '';
-        for (const char of chunk) {
-          const candidate = `${buffer}${char}`;
-          const candidateWidth = textWidth(chunkFont, candidate, size);
-          if (candidateWidth > contentWidth && buffer) {
-            currentLine.push({ text: buffer, style: styleInfo });
-            currentLineWidth += textWidth(chunkFont, buffer, size);
-            await drawLine();
-            buffer = char;
-          } else {
-            buffer = candidate;
-          }
-        }
-        if (buffer) {
-          currentLine.push({ text: buffer, style: styleInfo });
-          currentLineWidth += textWidth(chunkFont, buffer, size);
-        }
-        return;
-      }
-
-      currentLine.push({ text: chunk, style: styleInfo });
-      currentLineWidth += chunkWidth;
-    };
-
-    for (const token of tokens) {
-      if (token.type === 'newline') {
-        await drawLine();
-        continue;
-      }
-
-      const chunks = token.text.split(/(\s+)/).filter((c) => c.length > 0);
-      for (const chunk of chunks) {
-        await pushChunk(chunk, token.style);
-      }
-    }
-
-    await drawLine();
-
-    // Keep paragraph gap only when it does not force a pointless page break.
-    if (y - TYPOGRAPHY.paragraphSpacing >= minY) {
-      y -= TYPOGRAPHY.paragraphSpacing;
-    }
-  };
+  ) =>
+    drawRichParagraph({
+      text,
+      parseRichText,
+      leftX,
+      contentWidth,
+      size,
+      lineGap,
+      paragraphSpacing: TYPOGRAPHY.paragraphSpacing,
+      minY,
+      fonts: {
+        regular: font,
+        bold: helveticaBold,
+        italic: helveticaItalic,
+        boldItalic: helveticaBoldItalic,
+      },
+      pageAccess: {
+        getPage: () => page,
+        getY: () => y,
+        setY: (nextY) => {
+          y = nextY;
+        },
+        ensureSpace,
+      },
+    });
 
   const title = 'APPRAISAL LETTER';
   const titleWidth = textWidth(helveticaBold, title, TYPOGRAPHY.heading1.size);
@@ -314,7 +114,7 @@ export const generateAppraisalLetterPdfBuffer = async (
   });
   y -= 26;
 
-  const paragraphs = normalizeParagraphs(payload);
+  const paragraphs = normalizeParagraphList(payload, 3);
   for (const paragraph of paragraphs) {
     await drawParagraph(paragraph, helvetica, 11, TYPOGRAPHY.body.lineGap);
   }
@@ -322,8 +122,8 @@ export const generateAppraisalLetterPdfBuffer = async (
   const signatureImage = await loadSignatureImage(pdfDoc, payload.signatureUrl);
   let estimatedSignatureImageHeight = 0;
   if (signatureImage) {
-    const maxW = 220;
-    const maxH = 80;
+    const maxW = LETTER_LAYOUT.signatureImage.maxWidth;
+    const maxH = LETTER_LAYOUT.signatureImage.maxHeight;
     const ratio = Math.min(maxW / signatureImage.width, maxH / signatureImage.height);
     estimatedSignatureImageHeight = signatureImage.height * ratio;
   }
@@ -347,8 +147,8 @@ export const generateAppraisalLetterPdfBuffer = async (
   y -= 24;
 
   if (signatureImage) {
-    const maxW = 220;
-    const maxH = 80;
+    const maxW = LETTER_LAYOUT.signatureImage.maxWidth;
+    const maxH = LETTER_LAYOUT.signatureImage.maxHeight;
     const ratio = Math.min(maxW / signatureImage.width, maxH / signatureImage.height);
     const drawW = signatureImage.width * ratio;
     const drawH = signatureImage.height * ratio;

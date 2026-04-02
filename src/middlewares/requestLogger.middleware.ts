@@ -15,9 +15,9 @@ export const requestLoggerMiddleware = (req, res, next) => {
     ip: req.ip,
   });
 
-  // Intercept response.tson to log response
-  const originalJson = res.tson;
-  res.tson = function (data) {
+  // Intercept response.json to log response
+  const originalJson = res.json;
+  res.json = function (data) {
     const duration = Date.now() - startTime;
     logger.info({
       message: 'Outgoing response',

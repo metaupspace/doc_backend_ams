@@ -1,120 +1,17 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { PDFDocument } from 'pdf-lib';
 import { INTERNSHIP_COMPLETION_CERTIFICATE_DEFAULT_PARAGRAPHS } from '../../config/document.config.ts';
-
-const COMPANY_NAME = 'MetaUpSpace LLP';
-
-const TYPOGRAPHY = {
-  headingSize: 21,
-  bodySize: 11,
-  bodyLineGap: 6,
-  greetingSize: 12,
-  issueSize: 11,
-  paragraphSpacing: 7,
-  signatureNameSize: 12,
-  signatureMetaSize: 11,
-};
-
-const formatIssueDate = (value) => {
-  const d = value ? new Date(value) : new Date();
-  if (Number.isNaN(d.getTime())) {
-    return new Date().toLocaleDateString('en-GB');
-  }
-  return d.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-};
-
-const decodeHtmlEntities = (text) => {
-  return String(text)
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-};
-
-const parseRichText = (htmlLikeText) => {
-  const input = String(htmlLikeText || '');
-  const parts = input.split(/(<[^>]+>)/g).filter(Boolean);
-  const tokens = [];
-
-  const style = { bold: false, italic: false, underline: false };
-
-  const pushText = (value) => {
-    const decoded = decodeHtmlEntities(value);
-    if (!decoded) return;
-    tokens.push({
-      type: 'text',
-      text: decoded,
-      style: {
-        bold: style.bold,
-        italic: style.italic,
-        underline: style.underline,
-      },
-    });
-  };
-
-  for (const part of parts) {
-    if (!part.startsWith('<')) {
-      pushText(part);
-      continue;
-    }
-
-    const tag = part.toLowerCase().replace(/\s+/g, '');
-    if (tag === '<br>' || tag === '<br/>' || tag === '<br/ >') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-    if (tag === '<p>' || tag === '<div>') continue;
-    if (tag === '</p>' || tag === '</div>') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-    if (tag === '<b>' || tag === '<strong>') {
-      style.bold = true;
-      continue;
-    }
-    if (tag === '</b>' || tag === '</strong>') {
-      style.bold = false;
-      continue;
-    }
-    if (tag === '<i>' || tag === '<em>') {
-      style.italic = true;
-      continue;
-    }
-    if (tag === '</i>' || tag === '</em>') {
-      style.italic = false;
-      continue;
-    }
-    if (tag === '<u>') {
-      style.underline = true;
-      continue;
-    }
-    if (tag === '</u>') {
-      style.underline = false;
-      continue;
-    }
-  }
-
-  return tokens;
-};
-
-const normalizeParagraphs = (payload) => {
-  const inputParagraphs = Array.isArray(payload.paragraphs)
-    ? payload.paragraphs.filter(Boolean)
-    : [payload.paragraph1, payload.paragraph2].filter(Boolean);
-
-  if (inputParagraphs.length > 0) {
-    return inputParagraphs;
-  }
-
-  return [...INTERNSHIP_COMPLETION_CERTIFICATE_DEFAULT_PARAGRAPHS];
-};
+import { COMPANY_NAME } from '../../config/commonDetail.config.ts';
+import { TYPOGRAPHY } from '../../config/typography.config.ts';
+import { LETTER_LAYOUT } from '../../config/letterLayout.config.ts';
+import { formatIssueDate } from '../../utils/formatIssueDate.util.ts';
+import { parseRichText } from '../../utils/parseRichText.util.ts';
+import { loadSignatureImage } from '../../utils/loadSignatureImage.util.ts';
+import { embedDMSansFonts } from '../../utils/fontLoader.util.ts';
+import { drawRichParagraph, textWidth } from '../../utils/pdfTextLayout.util.ts';
+import { normalizeParagraphsWithDefaults } from '../../utils/paragraphs.util.ts';
+import { drawSimpleLine } from '../../utils/pdfLineLayout.util.ts';
 
 export const generateInternshipCompletionCertificatePdfBuffer = async (
   payload,
@@ -129,21 +26,20 @@ export const generateInternshipCompletionCertificatePdfBuffer = async (
   const [templatePage] = await pdfDoc.copyPages(letterheadDoc, [0]);
   let page = pdfDoc.addPage(templatePage);
 
-  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const helveticaItalic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
-  const helveticaBoldItalic = await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
+  const fonts = await embedDMSansFonts(pdfDoc);
+  const helvetica = fonts.regular;
+  const helveticaBold = fonts.bold;
+  const helveticaItalic = fonts.italic;
+  const helveticaBoldItalic = fonts.boldItalic;
 
   const pageWidth = page.getWidth();
-  const topY = page.getHeight() - 160;
-  const leftX = 34;
-  const rightX = pageWidth - 34;
+  const topY = page.getHeight() - LETTER_LAYOUT.topOffset;
+  const leftX = LETTER_LAYOUT.sidePadding;
+  const rightX = pageWidth - LETTER_LAYOUT.sidePadding;
   const contentWidth = rightX - leftX;
-  const minY = 96;
+  const minY = LETTER_LAYOUT.minY;
 
   let y = topY;
-
-  const textWidth = (font, text, size) => font.widthOfTextAtSize(text, size);
 
   const newTemplatePage = async () => {
     const [copied] = await pdfDoc.copyPages(letterheadDoc, [0]);
@@ -157,124 +53,73 @@ export const generateInternshipCompletionCertificatePdfBuffer = async (
     }
   };
 
-  const drawLineRich = async (line, size, lineHeight, fontPicker) => {
-    if (line.length === 0) return;
-    await ensureSpace(lineHeight);
-    let cursorX = leftX;
-
-    for (const segment of line) {
-      const segmentFont = fontPicker(segment.style);
-      const segmentWidth = textWidth(segmentFont, segment.text, size);
-
-      page.drawText(segment.text, { x: cursorX, y, size, font: segmentFont });
-
-      if (segment.style.underline) {
-        page.drawLine({
-          start: { x: cursorX, y: y - 1.5 },
-          end: { x: cursorX + segmentWidth, y: y - 1.5 },
-          thickness: 0.8,
-        });
-      }
-
-      cursorX += segmentWidth;
-    }
-
-    y -= lineHeight;
-  };
-
   const drawParagraph = async (
     text,
-    size = TYPOGRAPHY.bodySize,
-    lineGap = TYPOGRAPHY.bodyLineGap
-  ) => {
-    const lineHeight = size + lineGap;
-    const tokens = parseRichText(text);
-    const currentLine = [];
-    let currentLineWidth = 0;
-
-    const fontForStyle = (styleInfo) => {
-      if (styleInfo.bold && styleInfo.italic) return helveticaBoldItalic;
-      if (styleInfo.bold) return helveticaBold;
-      if (styleInfo.italic) return helveticaItalic;
-      return helvetica;
-    };
-
-    const flushLine = async () => {
-      await drawLineRich(currentLine, size, lineHeight, fontForStyle);
-      currentLine.length = 0;
-      currentLineWidth = 0;
-    };
-
-    const pushChunk = async (chunk, styleInfo) => {
-      if (!chunk) return;
-      if (/^\s+$/.test(chunk) && currentLine.length === 0) return;
-
-      const chunkFont = fontForStyle(styleInfo);
-      const chunkWidth = textWidth(chunkFont, chunk, size);
-
-      if (
-        !/^\s+$/.test(chunk) &&
-        currentLineWidth + chunkWidth > contentWidth &&
-        currentLine.length > 0
-      ) {
-        await flushLine();
-      }
-
-      currentLine.push({ text: chunk, style: styleInfo });
-      currentLineWidth += chunkWidth;
-    };
-
-    for (const token of tokens) {
-      if (token.type === 'newline') {
-        await flushLine();
-        continue;
-      }
-
-      const chunks = token.text.split(/(\s+)/).filter((c) => c.length > 0);
-      for (const chunk of chunks) {
-        await pushChunk(chunk, token.style);
-      }
-    }
-
-    await flushLine();
-
-    if (y - TYPOGRAPHY.paragraphSpacing >= minY) {
-      y -= TYPOGRAPHY.paragraphSpacing;
-    }
-  };
-
-  const drawSimpleLine = async (text, font = helvetica, size = TYPOGRAPHY.bodySize, indent = 0) => {
-    const lineHeight = size + TYPOGRAPHY.bodyLineGap;
-    await ensureSpace(lineHeight);
-    page.drawText(String(text || ''), { x: leftX + indent, y, size, font });
-    y -= lineHeight;
-  };
+    size = TYPOGRAPHY.body.size,
+    lineGap = TYPOGRAPHY.body.lineGap
+  ) =>
+    drawRichParagraph({
+      text,
+      parseRichText,
+      leftX,
+      contentWidth,
+      size,
+      lineGap,
+      paragraphSpacing: TYPOGRAPHY.paragraphSpacing,
+      minY,
+      fonts: {
+        regular: helvetica,
+        bold: helveticaBold,
+        italic: helveticaItalic,
+        boldItalic: helveticaBoldItalic,
+      },
+      pageAccess: {
+        getPage: () => page,
+        getY: () => y,
+        setY: (nextY) => {
+          y = nextY;
+        },
+        ensureSpace,
+      },
+    });
 
   const title = payload.title || 'INTERNSHIP COMPLETION CERTIFICATE';
-  const titleWidth = textWidth(helveticaBold, title, TYPOGRAPHY.headingSize);
+  const titleWidth = textWidth(helveticaBold, title, TYPOGRAPHY.heading2.size);
   await ensureSpace(58);
   page.drawText(title, {
     x: (pageWidth - titleWidth) / 2,
     y,
-    size: TYPOGRAPHY.headingSize,
+    size: TYPOGRAPHY.heading2.size,
     font: helveticaBold,
   });
   y -= 40;
 
-  const issueLabel = `[Date of Issuance: ${formatIssueDate(payload.issueDate || issuedAt)}]`;
-  const issueWidth = textWidth(helveticaBold, issueLabel, TYPOGRAPHY.issueSize);
-  page.drawText(issueLabel, {
+  const issueText = formatIssueDate(payload.issueDate || issuedAt);
+  const issueWidth = textWidth(helveticaBold, issueText, TYPOGRAPHY.bodyHighlighted.size);
+  page.drawText(issueText, {
     x: rightX - issueWidth,
     y,
-    size: TYPOGRAPHY.issueSize,
+    size: TYPOGRAPHY.bodyHighlighted.size,
     font: helveticaBold,
   });
   y -= 30;
 
   await drawSimpleLine(
-    payload.greeting || 'To Whom It May Concern,',
-    helveticaBold,
-    TYPOGRAPHY.greetingSize
+    {
+      text: payload.greeting || 'To Whom It May Concern,',
+      font: helveticaBold,
+      size: TYPOGRAPHY.bodyHighlighted.size,
+      leftX,
+      lineGap: TYPOGRAPHY.body.lineGap,
+      pageAccess: {
+        getPage: () => page,
+        getY: () => y,
+        setY: (nextY) => {
+          y = nextY;
+        },
+        ensureSpace,
+      },
+    }
   );
   y -= 10;
 
@@ -294,25 +139,89 @@ export const generateInternshipCompletionCertificatePdfBuffer = async (
 
   await drawParagraph(introParagraph);
 
-  const paragraphs = normalizeParagraphs(payload);
+  const paragraphs = normalizeParagraphsWithDefaults(
+    payload,
+    INTERNSHIP_COMPLETION_CERTIFICATE_DEFAULT_PARAGRAPHS
+  );
   for (const paragraph of paragraphs) {
     await drawParagraph(paragraph);
   }
 
   y -= 4;
   await drawSimpleLine(
-    payload.closingText || 'Warm regards,',
-    helveticaBold,
-    TYPOGRAPHY.greetingSize
+    {
+      text: payload.closingText || 'Warm regards,',
+      font: helveticaBold,
+      size: TYPOGRAPHY.bodyHighlighted.size,
+      leftX,
+      lineGap: TYPOGRAPHY.body.lineGap,
+      pageAccess: {
+        getPage: () => page,
+        getY: () => y,
+        setY: (nextY) => {
+          y = nextY;
+        },
+        ensureSpace,
+      },
+    }
   );
   y -= 54;
 
-  await ensureSpace(80);
+  const leftSignatureImage = await loadSignatureImage(
+    pdfDoc,
+    payload.leftSignatoryUrl || payload.signatureUrl
+  );
+  const rightSignatureImage = await loadSignatureImage(
+    pdfDoc,
+    payload.rightSignatoryUrl || payload.signatureUrl
+  );
+
+  const maxSignatureWidth = LETTER_LAYOUT.signatureImage.maxWidth;
+  const maxSignatureHeight = LETTER_LAYOUT.signatureImage.maxHeight;
+
+  const leftSignatureDims = leftSignatureImage
+    ? (() => {
+        const ratio = Math.min(
+          maxSignatureWidth / leftSignatureImage.width,
+          maxSignatureHeight / leftSignatureImage.height
+        );
+        return {
+          width: leftSignatureImage.width * ratio,
+          height: leftSignatureImage.height * ratio,
+        };
+      })()
+    : null;
+
+  const rightSignatureDims = rightSignatureImage
+    ? (() => {
+        const ratio = Math.min(
+          maxSignatureWidth / rightSignatureImage.width,
+          maxSignatureHeight / rightSignatureImage.height
+        );
+        return {
+          width: rightSignatureImage.width * ratio,
+          height: rightSignatureImage.height * ratio,
+        };
+      })()
+    : null;
+
+  const maxSignatureDrawHeight = Math.max(
+    leftSignatureDims?.height || 0,
+    rightSignatureDims?.height || 0
+  );
+  const signatoryLineGap = 18;
+
+  const signatureBlockHeight =
+    (maxSignatureDrawHeight ? maxSignatureDrawHeight : 0) +
+    signatoryLineGap * 2;
+
+  await ensureSpace(signatureBlockHeight);
 
   const columnWidth = (contentWidth - 32) / 2;
   const leftColumnX = leftX;
   const rightColumnX = leftX + columnWidth + 32;
-  const signatureY = y;
+  const signatureImageY = y;
+  const signatureY = y - (maxSignatureDrawHeight ? maxSignatureDrawHeight : 0);
 
   const leftName = payload.leftSignatoryName || 'Sahil Jaiswal';
   const leftRole = payload.leftSignatoryRole || 'CEO & Founder';
@@ -322,24 +231,42 @@ export const generateInternshipCompletionCertificatePdfBuffer = async (
   const rightRole = payload.rightSignatoryRole || `${payload.department || '[Department]'} Manager`;
   const rightCompany = payload.rightSignatoryCompany || companyName;
 
+  if (leftSignatureImage && leftSignatureDims) {
+    page.drawImage(leftSignatureImage, {
+      x: leftColumnX,
+      y: signatureImageY,
+      width: leftSignatureDims.width,
+      height: leftSignatureDims.height,
+    });
+  }
+
+  if (rightSignatureImage && rightSignatureDims) {
+    page.drawImage(rightSignatureImage, {
+      x: rightColumnX,
+      y: signatureImageY,
+      width: rightSignatureDims.width,
+      height: rightSignatureDims.height,
+    });
+  }
+
   page.drawText(String(leftName), {
     x: leftColumnX,
     y: signatureY,
-    size: TYPOGRAPHY.signatureNameSize,
+    size: TYPOGRAPHY.bodyHighlighted.size,
     font: helveticaBold,
     maxWidth: columnWidth,
   });
   page.drawText(String(leftRole), {
     x: leftColumnX,
-    y: signatureY - 24,
-    size: TYPOGRAPHY.signatureMetaSize,
+    y: signatureY - signatoryLineGap,
+    size: TYPOGRAPHY.body.size,
     font: helveticaBold,
     maxWidth: columnWidth,
   });
   page.drawText(String(leftCompany), {
     x: leftColumnX,
-    y: signatureY - 48,
-    size: TYPOGRAPHY.signatureMetaSize,
+    y: signatureY - signatoryLineGap * 2,
+    size: TYPOGRAPHY.bodyHighlighted.size,
     font: helveticaBold,
     maxWidth: columnWidth,
   });
@@ -347,21 +274,21 @@ export const generateInternshipCompletionCertificatePdfBuffer = async (
   page.drawText(String(rightName), {
     x: rightColumnX,
     y: signatureY,
-    size: TYPOGRAPHY.signatureNameSize,
+    size: TYPOGRAPHY.bodyHighlighted.size,
     font: helveticaBold,
     maxWidth: columnWidth,
   });
   page.drawText(String(rightRole), {
     x: rightColumnX,
-    y: signatureY - 24,
-    size: TYPOGRAPHY.signatureMetaSize,
+    y: signatureY - signatoryLineGap,
+    size: TYPOGRAPHY.body.size,
     font: helveticaBold,
     maxWidth: columnWidth,
   });
   page.drawText(String(rightCompany), {
     x: rightColumnX,
-    y: signatureY - 48,
-    size: TYPOGRAPHY.signatureMetaSize,
+    y: signatureY - signatoryLineGap * 2,
+    size: TYPOGRAPHY.bodyHighlighted.size,
     font: helveticaBold,
     maxWidth: columnWidth,
   });

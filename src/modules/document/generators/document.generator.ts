@@ -4,7 +4,7 @@ import { DOCUMENT_SPECIFICATIONS } from '../config/document.config.ts';
 import { generateAppraisalLetterPdfBuffer } from './templates/appraisalLetter.generator.ts';
 import { generateContractualLetterPdfBuffer } from './templates/contractualLetter.generator.ts';
 import { generateLetterOfIntentPdfBuffer } from './templates/letterOfIntent.generator.ts';
-import { generateOfferLetterPdfBuffer } from './templates/offerLetter.generator.ts';
+import { generateInternshipOfferLetterPdfBuffer } from './templates/internshipOfferLetter.generator.ts';
 import { generateInternshipCompletionCertificatePdfBuffer } from './templates/internshipCompletionCertificate.generator.ts';
 import { generateInternshipToFullTimeLetterPdfBuffer } from './templates/internshipToFullTimeLetter.generator.ts';
 import { generateJoiningLetterPdfBuffer } from './templates/joiningLetter.generator.ts';
@@ -119,8 +119,8 @@ export const generatePDFBuffer = async (
     });
   }
 
-  if (documentType === 'offer-letter') {
-    return generateOfferLetterPdfBuffer(payload, {
+  if (documentType === 'internship-offer-letter') {
+    return generateInternshipOfferLetterPdfBuffer(payload, {
       issuedAt: context.issuedAt,
     });
   }

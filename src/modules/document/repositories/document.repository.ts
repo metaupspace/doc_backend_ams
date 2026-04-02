@@ -76,7 +76,11 @@ export const findDocuments = async ({ filters, search, page, limit }) => {
 
 export const findDocumentById = (id) => Document.findById(id).exec();
 
-const OFFER_DOCUMENT_TYPES = ['offer-letter', 'probation-offer-letter', 'contractual-letter'];
+const OFFER_DOCUMENT_TYPES = [
+  'internship-offer-letter',
+  'probation-offer-letter',
+  'contractual-letter',
+];
 
 export const findSuccessfulOfferLetterForEmployee = ({ employeeId, offerLetterDocumentId }) => {
   const filters: Record<string, any> = {

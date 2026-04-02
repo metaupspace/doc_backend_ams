@@ -97,7 +97,7 @@ Use this route to verify JWT middleware is working without touching DB-heavy han
 ### Swagger Documentation
 
 - Swagger UI: `GET /api-docs`
-- OpenAPI JSON: `GET /openapi.tson`
+- OpenAPI JSON: `GET /openapi.json`
 
 Swagger covers health and all document endpoints, including authentication requirements.
 ```

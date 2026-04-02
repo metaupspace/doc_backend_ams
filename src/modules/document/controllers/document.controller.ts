@@ -10,7 +10,7 @@ export const generateDocument = async (req, res, next) => {
     const { documentType } = req.params;
 
     if (!canCreateDocument(documentType, req.user?.roles || [], { isPerformanceReport })) {
-      return res.status(403).tson({
+      return res.status(403).json({
         status: 'error',
         message:
           documentType === 'performance-report'
@@ -48,7 +48,7 @@ export const generateDocument = async (req, res, next) => {
     pdfStream.on('error', (err) => {
       logger.error(`PDF stream error: ${err.message}`);
       if (!res.headersSent) {
-        res.status(500).tson({ status: 'error', message: 'Failed to stream PDF' });
+        res.status(500).json({ status: 'error', message: 'Failed to stream PDF' });
       }
     });
 
@@ -72,7 +72,7 @@ export const generateDocumentByType = (documentType) => {
 export const getDocuments = async (req, res, next) => {
   try {
     if (!canReadDocuments(req.user?.roles || [])) {
-      return res.status(403).tson({
+      return res.status(403).json({
         status: 'error',
         message: 'Only EMPLOYEE, HR, or MANAGER can access documents',
       });
@@ -101,7 +101,7 @@ export const getDocuments = async (req, res, next) => {
 export const getDocumentById = async (req, res, next) => {
   try {
     if (!canReadDocuments(req.user?.roles || [])) {
-      return res.status(403).tson({
+      return res.status(403).json({
         status: 'error',
         message: 'Only EMPLOYEE, HR, or MANAGER can access documents',
       });

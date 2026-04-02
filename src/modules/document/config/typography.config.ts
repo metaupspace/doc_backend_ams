@@ -2,45 +2,42 @@
  * MUS Documentation Typography Standards
  * Font Family: DM Sans (all styles)
  * Follows MUS design guidelines for consistent document styling
- *
- * PRODUCTION READY: DM Sans fonts are embedded from ./public/fonts/dm-sans/static/
- * Font variants: Regular, Bold, Italic, BoldItalic (cached on first load)
  */
 
 export const TYPOGRAPHY = {
-  // Heading 1: DM Sans, Bold, 28
+  // Heading 1: DM Sans, Bold, 26
   heading1: {
-    size: 28,
+    size: 26,
     weight: 'bold',
-    fontFamily: 'DM Sans',
+    fontFamily: 'semiDM Sans',
   },
 
-  // Heading 2: DM Sans, Bold, 20
+  // Heading 2: DM Sans, Bold, 18
   heading2: {
-    size: 20,
-    weight: 'bold',
+    size: 18,
+    weight: 'semibold',
     fontFamily: 'DM Sans',
   },
 
-  // Heading 3: DM Sans, Bold, 16
+  // Heading 3: DM Sans, Bold, 14
   heading3: {
-    size: 16,
-    weight: 'bold',
+    size: 14,
+    weight: 'semibold',
     fontFamily: 'DM Sans',
   },
 
-  // Body: DM Sans, Regular, 12
+  // Body: DM Sans, Regular, 9
   body: {
-    size: 12,
+    size: 9,
     weight: 'regular',
     fontFamily: 'DM Sans',
     lineGap: 6,
   },
 
-  // Body (Highlighted): DM Sans, Bold, 12
+  // Body (Highlighted): DM Sans, Bold, 10
   bodyHighlighted: {
-    size: 12,
-    weight: 'bold',
+    size: 10,
+    weight: 'semibold',
     fontFamily: 'DM Sans',
   },
 

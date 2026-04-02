@@ -31,14 +31,14 @@ export const errorHandler = (err, req, res) => {
     response.stack = err.stack;
   }
 
-  res.status(statusCode).tson(response);
+  res.status(statusCode).json(response);
 };
 
 /**
  * 404 Not Found handler
  */
 export const notFoundHandler = (req, res) => {
-  res.status(404).tson({
+  res.status(404).json({
     status: 'error',
     message: 'Route not found',
     path: req.path,

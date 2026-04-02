@@ -14,7 +14,7 @@ export const globalRateLimiter = rateLimit({
   skip: (req) => req.path === '/health', // Don't rate limit health check
   handler: (req, res) => {
     logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
-    res.status(429).tson({
+    res.status(429).json({
       status: 'error',
       message: 'Too many requests. Please try again later.',
     });
@@ -33,7 +33,7 @@ export const documentGenerationRateLimiter = rateLimit({
   legacyHeaders: false,
   handler: (req, res) => {
     logger.warn(`Document generation rate limit exceeded for IP: ${req.ip}`);
-    res.status(429).tson({
+    res.status(429).json({
       status: 'error',
       message: 'Too many document generation requests. Please try again after a minute.',
     });

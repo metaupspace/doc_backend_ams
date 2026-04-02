@@ -1,5 +1,5 @@
 import { Readable } from 'node:stream';
-import mongoose from 'mongoose';
+// import mongoose from 'mongoose';
 import logger from '../../../config/logger.ts';
 import { generatePDFBuffer } from '../generators/document.generator.ts';
 import * as documentRepository from '../repositories/document.repository.ts';
@@ -37,30 +37,30 @@ export const createAndGenerateDocument = async ({
     }
   }
 
-  if (documentType === 'joining-letter') {
-    const offerLetterDocumentId = payload?.offerLetterDocumentId;
+  // if (documentType === 'joining-letter') {
+  //   const offerLetterDocumentId = payload?.offerLetterDocumentId;
 
-    if (offerLetterDocumentId && !mongoose.Types.ObjectId.isValid(String(offerLetterDocumentId))) {
-      const err = new Error('offerLetterDocumentId is invalid');
-      err.statusCode = 400;
-      throw err;
-    }
+  //   if (offerLetterDocumentId && !mongoose.Types.ObjectId.isValid(String(offerLetterDocumentId))) {
+  //     const err = new Error('offerLetterDocumentId is invalid');
+  //     err.statusCode = 400;
+  //     throw err;
+  //   }
 
-    const offerLetter = await documentRepository.findSuccessfulOfferLetterForEmployee({
-      employeeId,
-      offerLetterDocumentId,
-    });
+  //   const offerLetter = await documentRepository.findSuccessfulOfferLetterForEmployee({
+  //     employeeId,
+  //     offerLetterDocumentId,
+  //   });
 
-    if (!offerLetter) {
-      const err = new Error(
-        offerLetterDocumentId
-          ? `Corresponding offer letter ${offerLetterDocumentId} not found for employee ${employeeId}`
-          : `No corresponding offer letter found for employee ${employeeId}`
-      );
-      err.statusCode = 404;
-      throw err;
-    }
-  }
+  //   if (!offerLetter) {
+  //     const err = new Error(
+  //       offerLetterDocumentId
+  //         ? `Corresponding offer letter ${offerLetterDocumentId} not found for employee ${employeeId}`
+  //         : `No corresponding offer letter found for employee ${employeeId}`
+  //     );
+  //     err.statusCode = 404;
+  //     throw err;
+  //   }
+  // }
 
   const documentRecord = await documentRepository.createDocument({
     documentType,

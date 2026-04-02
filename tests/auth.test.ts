@@ -16,7 +16,7 @@ test('Auth Middleware - should reject invalid token', async () => {
       },
     });
 
-    const json = await res.tson();
+    const json = await res.json();
     assert.equal(res.status, 401, 'Should return 401 Unauthorized');
     assert.equal(json.status, 'error', 'Should return error status');
     assert.match(json.message, /invalid|expired/i, 'Should mention token issue');
@@ -32,7 +32,7 @@ test('Auth Middleware - should reject missing token', async () => {
 
   try {
     const res = await fetch(`http://127.0.0.1:${port}/api/v1/documents/auth-test`);
-    const json = await res.tson();
+    const json = await res.json();
 
     assert.equal(res.status, 401, 'Should return 401 Unauthorized');
     assert.equal(json.status, 'error', 'Should return error status');
@@ -59,7 +59,7 @@ test('Auth Middleware - should accept valid token', async () => {
       },
     });
 
-    const json = await res.tson();
+    const json = await res.json();
     assert.equal(res.status, 200, 'Should pass token validation');
     assert.equal(json.status, 'success', 'Should return success status');
     assert.equal(json.data.user.id, 'test-user', 'Should expose user from token');
@@ -80,7 +80,7 @@ test('Auth Middleware - should reject malformed Bearer header', async () => {
       },
     });
 
-    await res.tson();
+    await res.json();
     assert.equal(res.status, 401, 'Should return 401 Unauthorized');
   } finally {
     server.close();

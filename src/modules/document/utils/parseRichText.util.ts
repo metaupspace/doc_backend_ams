@@ -1,4 +1,4 @@
-import { decodeHtmlEntities } .ts;
+import { decodeHtmlEntities } from './decodeHtmlEntities.util.ts';
 export const parseRichText = (htmlLikeText) => {
   const input = String(htmlLikeText || '');
   const parts = input.split(/(<[^>]+>)/g).filter(Boolean);

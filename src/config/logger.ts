@@ -7,7 +7,7 @@ const logger = winston.createLogger({
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.errors({ stack: true }),
     winston.format.splat(),
-    winston.format.tson()
+    winston.format.json()
   ),
   defaultMeta: { service: 'doc-generation-service' },
   transports: [

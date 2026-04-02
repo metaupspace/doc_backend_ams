@@ -6,7 +6,7 @@
  * @param {*} data - Response data
  */
 export const successResponse = (res, statusCode = 200, message = 'Success', data = null) => {
-  return res.status(statusCode).tson({
+  return res.status(statusCode).json({
     status: 'success',
     message,
     data,
@@ -21,7 +21,7 @@ export const successResponse = (res, statusCode = 200, message = 'Success', data
  * @param {Array} errors - Array of validation or detailed errors
  */
 export const errorResponse = (res, statusCode = 500, message = 'Error', errors = null) => {
-  return res.status(statusCode).tson({
+  return res.status(statusCode).json({
     status: 'error',
     message,
     errors,
@@ -34,7 +34,7 @@ export const errorResponse = (res, statusCode = 500, message = 'Error', errors =
  * @param {Array} errors - Array of validation errors
  */
 export const validationErrorResponse = (res, errors) => {
-  return res.status(400).tson({
+  return res.status(400).json({
     status: 'error',
     message: 'Validation failed',
     errors,

@@ -9,15 +9,23 @@ import {
   INTERNSHIP_COMPLETION_CERTIFICATE_DEFAULT_PARAGRAPHS,
   INTERNSHIP_TO_FULL_TIME_LETTER_DEFAULT_PARAGRAPHS,
   JOINING_LETTER_DEFAULT_PARAGRAPHS,
+  PROMOTION_LETTER_DEFAULT_INTRO_PARAGRAPH,
   PROMOTION_LETTER_DEFAULT_PARAGRAPHS,
   PROBATION_COMPLETION_LETTER_DEFAULT_PARAGRAPHS,
+  RELIEVING_LETTER_DEFAULT_INTRO_PARAGRAPH,
   RELIEVING_LETTER_DEFAULT_PARAGRAPHS,
+  WORK_EXPERIENCE_LETTER_DEFAULT_INTRO_PARAGRAPH,
   WORK_EXPERIENCE_LETTER_DEFAULT_PARAGRAPHS,
+  RESIGNATION_ACCEPTANCE_LETTER_DEFAULT_INTRO_PARAGRAPH,
   RESIGNATION_ACCEPTANCE_LETTER_DEFAULT_PARAGRAPHS,
   TERMINATION_LETTER_DEFAULT_PARAGRAPHS,
+  TERMINATION_LETTER_DEFAULT_INTRO_PARAGRAPH,
+  WARNING_DISCIPLINARY_LETTER_DEFAULT_INTRO_PARAGRAPH,
   WARNING_DISCIPLINARY_LETTER_DEFAULT_PARAGRAPHS,
+  WARNING_LETTER_DEFAULT_INTRO_PARAGRAPH,
   WARNING_LETTER_DEFAULT_PARAGRAPHS,
   PROBATION_OFFER_LETTER_DEFAULT_PARAGRAPHS,
+  PROBATION_OFFER_LETTER_DEFAULT_INTRO_PARAGRAPH,
   DOCUMENT_SPECIFICATIONS,
   DOCUMENT_TYPES,
 } from '../config/document.config.ts';
@@ -163,7 +171,10 @@ export const validateDocumentRequest = (documentType, data): any => {
 
     p.paragraphs =
       inputParagraphs.length > 0 ? inputParagraphs : [...PROBATION_OFFER_LETTER_DEFAULT_PARAGRAPHS];
+    p.introParagraph = p.introParagraph || PROBATION_OFFER_LETTER_DEFAULT_INTRO_PARAGRAPH;
     p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
+    p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
+    p.position = p.position || 'CEO & Founder';
   }
 
   if (documentType === 'relieving-letter') {
@@ -172,11 +183,16 @@ export const validateDocumentRequest = (documentType, data): any => {
       ? p.paragraphs.filter(Boolean)
       : [p.paragraph1, p.paragraph2].filter(Boolean);
 
+    p.introParagraph = p.introParagraph || RELIEVING_LETTER_DEFAULT_INTRO_PARAGRAPH;
     p.paragraphs =
       inputParagraphs.length > 0 ? inputParagraphs : [...RELIEVING_LETTER_DEFAULT_PARAGRAPHS];
+    p.companyName = p.companyName || 'MetaUpSpace LLP';
+    p.greeting = p.greeting || 'To Whomsoever Concerned,';
+    p.title = p.title || 'RELIEVING LETTER';
     p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
-    p.signatoryName = p.signatoryName || 'Authorized Signatory';
-    p.position = p.position || 'Position';
+    p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
+    p.position = p.position || 'CEO & Founder';
+    p.signatoryCompany = p.signatoryCompany || p.companyName;
   }
 
   if (documentType === 'termination-letter') {
@@ -185,11 +201,18 @@ export const validateDocumentRequest = (documentType, data): any => {
       ? p.paragraphs.filter(Boolean)
       : [p.paragraph1, p.paragraph2, p.paragraph3].filter(Boolean);
 
+    p.introParagraph = p.introParagraph || TERMINATION_LETTER_DEFAULT_INTRO_PARAGRAPH;
     p.paragraphs =
       inputParagraphs.length > 0 ? inputParagraphs : [...TERMINATION_LETTER_DEFAULT_PARAGRAPHS];
+    p.companyName = p.companyName || 'MetaUpSpace LLP';
+    p.title = p.title || 'TERMINATION LETTER';
+    p.greeting = p.greeting || "Dear Employee's Name,";
+    p.settlementIntro = p.settlementIntro || 'You will be entitled to receive:';
+    p.finalSettlementDays = p.finalSettlementDays || 45;
     p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
-    p.signatoryName = p.signatoryName || 'Authorized Signatory';
-    p.position = p.position || 'Position';
+    p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
+    p.position = p.position || 'CEO & Founder';
+    p.signatoryCompany = p.signatoryCompany || p.companyName;
   }
 
   if (documentType === 'warning-letter') {
@@ -198,11 +221,17 @@ export const validateDocumentRequest = (documentType, data): any => {
       ? p.paragraphs.filter(Boolean)
       : [p.paragraph1, p.paragraph2, p.paragraph3].filter(Boolean);
 
+    p.introParagraph = p.introParagraph || WARNING_LETTER_DEFAULT_INTRO_PARAGRAPH;
     p.paragraphs =
       inputParagraphs.length > 0 ? inputParagraphs : [...WARNING_LETTER_DEFAULT_PARAGRAPHS];
+    p.companyName = p.companyName || 'MetaUpSpace LLP';
+    p.title = p.title || 'FIRST WARNING LETTER';
+    p.greeting = p.greeting || "Dear Employee's Name,";
+    p.closingText = p.closingText || 'Sincerely,';
     p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
-    p.signatoryName = p.signatoryName || 'Authorized Signatory';
-    p.position = p.position || 'Position';
+    p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
+    p.position = p.position || 'CEO & Founder';
+    p.signatoryCompany = p.signatoryCompany || p.companyName;
   }
 
   if (documentType === 'resignation-acceptance-letter') {
@@ -211,13 +240,18 @@ export const validateDocumentRequest = (documentType, data): any => {
       ? p.paragraphs.filter(Boolean)
       : [p.paragraph1, p.paragraph2, p.paragraph3].filter(Boolean);
 
+    p.introParagraph = p.introParagraph || RESIGNATION_ACCEPTANCE_LETTER_DEFAULT_INTRO_PARAGRAPH;
     p.paragraphs =
       inputParagraphs.length > 0
         ? inputParagraphs
         : [...RESIGNATION_ACCEPTANCE_LETTER_DEFAULT_PARAGRAPHS];
+    p.companyName = p.companyName || 'MetaUpSpace LLP';
+    p.greeting = p.greeting || "Dear Candidate's name,";
+    p.title = p.title || 'RESIGNATION ACCEPTANCE LETTER';
     p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
-    p.signatoryName = p.signatoryName || 'Authorized Signatory';
-    p.position = p.position || 'Position';
+    p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
+    p.position = p.position || 'CEO & Founder';
+    p.signatoryCompany = p.signatoryCompany || p.companyName;
   }
 
   if (documentType === 'warning-and-disciplinary-letter') {
@@ -226,13 +260,19 @@ export const validateDocumentRequest = (documentType, data): any => {
       ? p.paragraphs.filter(Boolean)
       : [p.paragraph1, p.paragraph2, p.paragraph3].filter(Boolean);
 
+    p.introParagraph = p.introParagraph || WARNING_DISCIPLINARY_LETTER_DEFAULT_INTRO_PARAGRAPH;
     p.paragraphs =
       inputParagraphs.length > 0
         ? inputParagraphs
         : [...WARNING_DISCIPLINARY_LETTER_DEFAULT_PARAGRAPHS];
+    p.companyName = p.companyName || 'MetaUpSpace LLP';
+    p.title = p.title || 'WARNING AND DISCIPLINARY LETTER';
+    p.greeting = p.greeting || "Dear Employee's Name,";
+    p.closingText = p.closingText || 'Sincerely,';
     p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
-    p.signatoryName = p.signatoryName || 'Authorized Signatory';
-    p.position = p.position || 'Position';
+    p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
+    p.position = p.position || 'CEO & Founder';
+    p.signatoryCompany = p.signatoryCompany || p.companyName;
   }
 
   if (documentType === 'internship-completion-certificate') {
@@ -278,13 +318,16 @@ export const validateDocumentRequest = (documentType, data): any => {
 
     p.startDate = p.startDate || p.fromDate;
     p.endDate = p.endDate || p.toDate || p.lastWorkingDate;
+    p.introParagraph = p.introParagraph || WORK_EXPERIENCE_LETTER_DEFAULT_INTRO_PARAGRAPH;
     p.paragraphs =
       inputParagraphs.length > 0 ? inputParagraphs : [...WORK_EXPERIENCE_LETTER_DEFAULT_PARAGRAPHS];
     p.companyName = p.companyName || 'MetaUpSpace LLP';
     p.greeting = p.greeting || 'To Whom It May Concern,';
     p.title = p.title || 'WORK EXPERIENCE LETTER';
+    p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
     p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
     p.position = p.position || 'CEO & Founder';
+    p.signatoryCompany = p.signatoryCompany || p.companyName;
   }
 
   if (documentType === 'joining-letter') {
@@ -304,19 +347,22 @@ export const validateDocumentRequest = (documentType, data): any => {
     const p = result.value.payload;
     const inputParagraphs = Array.isArray(p.paragraphs)
       ? p.paragraphs.filter(Boolean)
-      : [p.paragraph1, p.paragraph2].filter(Boolean);
+      : [p.paragraph1, p.paragraph2, p.paragraph3].filter(Boolean);
 
     p.newJobTitle = p.newJobTitle || p.newDesignation;
     p.previousJobTitle = p.previousJobTitle || p.oldDesignation;
     p.effectiveFrom = p.effectiveFrom || p.effectiveDate;
     p.salaryEffectiveDate = p.salaryEffectiveDate || p.effectiveFrom;
+    p.introParagraph = p.introParagraph || PROMOTION_LETTER_DEFAULT_INTRO_PARAGRAPH;
     p.paragraphs =
       inputParagraphs.length > 0 ? inputParagraphs : [...PROMOTION_LETTER_DEFAULT_PARAGRAPHS];
     p.companyName = p.companyName || 'MetaUpSpace LLP';
     p.greeting = p.greeting || `Dear ${p.employeeName || 'Employee'},`;
     p.title = p.title || 'PROMOTION LETTER';
+    p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
     p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
     p.position = p.position || 'CEO & Founder';
+    p.signatoryCompany = p.signatoryCompany || p.companyName;
   }
 
   if (documentType === 'joining-letter') {

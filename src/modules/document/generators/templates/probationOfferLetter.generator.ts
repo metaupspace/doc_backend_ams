@@ -1,173 +1,21 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { PDFDocument } from 'pdf-lib';
+import { COMPANY_NAME } from '../../config/commonDetail.config.ts';
 import {
   CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL,
+  PROBATION_OFFER_LETTER_DEFAULT_INTRO_PARAGRAPH,
   PROBATION_OFFER_LETTER_DEFAULT_PARAGRAPHS,
 } from '../../config/document.config.ts';
-
-const COMPANY_NAME = 'MetaUpSpace LLP';
-
-const TYPOGRAPHY = {
-  headingSize: 24,
-  bodySize: 11,
-  bodyLineGap: 6,
-  greetingSize: 12,
-  issueSize: 11,
-  sectionSpacing: 8,
-  paragraphSpacing: 7,
-  signatureNameSize: 12,
-  signatureMetaSize: 11,
-};
-
-const formatIssueDate = (value) => {
-  const d = value ? new Date(value) : new Date();
-  if (Number.isNaN(d.getTime())) {
-    return new Date().toLocaleDateString('en-GB');
-  }
-  return d.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-};
-
-const decodeHtmlEntities = (text) => {
-  return String(text)
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-};
-
-const parseRichText = (htmlLikeText) => {
-  const input = String(htmlLikeText || '');
-  const parts = input.split(/(<[^>]+>)/g).filter(Boolean);
-  const tokens = [];
-
-  const style = {
-    bold: false,
-    italic: false,
-    underline: false,
-  };
-
-  const pushText = (value) => {
-    const decoded = decodeHtmlEntities(value);
-    if (!decoded) return;
-    tokens.push({
-      type: 'text',
-      text: decoded,
-      style: {
-        bold: style.bold,
-        italic: style.italic,
-        underline: style.underline,
-      },
-    });
-  };
-
-  for (const part of parts) {
-    if (!part.startsWith('<')) {
-      pushText(part);
-      continue;
-    }
-
-    const tag = part.toLowerCase().replace(/\s+/g, '');
-    if (tag === '<br>' || tag === '<br/>' || tag === '<br/ >') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-
-    if (tag === '<p>' || tag === '<div>') {
-      continue;
-    }
-
-    if (tag === '</p>' || tag === '</div>') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-
-    if (tag === '<li>') {
-      pushText('• ');
-      continue;
-    }
-
-    if (tag === '</li>') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-
-    if (tag === '<b>' || tag === '<strong>') {
-      style.bold = true;
-      continue;
-    }
-
-    if (tag === '</b>' || tag === '</strong>') {
-      style.bold = false;
-      continue;
-    }
-
-    if (tag === '<i>' || tag === '<em>') {
-      style.italic = true;
-      continue;
-    }
-
-    if (tag === '</i>' || tag === '</em>') {
-      style.italic = false;
-      continue;
-    }
-
-    if (tag === '<u>') {
-      style.underline = true;
-      continue;
-    }
-
-    if (tag === '</u>') {
-      style.underline = false;
-      continue;
-    }
-  }
-
-  return tokens;
-};
-
-const normalizeParagraphs = (payload) => {
-  const inputParagraphs = Array.isArray(payload.paragraphs)
-    ? payload.paragraphs.filter(Boolean)
-    : [payload.paragraph1, payload.paragraph2, payload.paragraph3, payload.paragraph4].filter(
-        Boolean
-      );
-
-  if (inputParagraphs.length > 0) {
-    return inputParagraphs;
-  }
-
-  return [...PROBATION_OFFER_LETTER_DEFAULT_PARAGRAPHS];
-};
-
-const loadSignatureImage = async (pdfDoc, signatureUrl) => {
-  if (!signatureUrl || typeof signatureUrl !== 'string') {
-    return null;
-  }
-
-  try {
-    const response = await fetch(signatureUrl);
-    if (!response.ok) return null;
-    const imageBytes = await response.arrayBuffer();
-    const contentType = response.headers.get('content-type') || '';
-
-    if (contentType.includes('png')) {
-      return pdfDoc.embedPng(imageBytes);
-    }
-    if (contentType.includes('jpeg') || contentType.includes('jpg')) {
-      return pdfDoc.embedJpg(imageBytes);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-};
+import { LETTER_LAYOUT } from '../../config/letterLayout.config.ts';
+import { TYPOGRAPHY } from '../../config/typography.config.ts';
+import { embedDMSansFonts } from '../../utils/fontLoader.util.ts';
+import { formatIssueDate } from '../../utils/formatIssueDate.util.ts';
+import { loadSignatureImage } from '../../utils/loadSignatureImage.util.ts';
+import { parseRichText } from '../../utils/parseRichText.util.ts';
+import { drawBulletLabelValue, drawSimpleLine } from '../../utils/pdfLineLayout.util.ts';
+import { drawRichParagraph, textWidth } from '../../utils/pdfTextLayout.util.ts';
+import { normalizeParagraphsWithDefaults } from '../../utils/paragraphs.util.ts';
 
 export const generateProbationOfferLetterPdfBuffer = async (
   payload,
@@ -182,21 +30,20 @@ export const generateProbationOfferLetterPdfBuffer = async (
   const [templatePage] = await pdfDoc.copyPages(letterheadDoc, [0]);
   let page = pdfDoc.addPage(templatePage);
 
-  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const helveticaItalic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
-  const helveticaBoldItalic = await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
+  const fonts = await embedDMSansFonts(pdfDoc);
+  const regularFont = fonts.regular;
+  const boldFont = fonts.bold;
+  const italicFont = fonts.italic;
+  const boldItalicFont = fonts.boldItalic;
 
   const pageWidth = page.getWidth();
-  const topY = page.getHeight() - 160;
-  const leftX = 34;
-  const rightX = pageWidth - 34;
+  const topY = page.getHeight() - LETTER_LAYOUT.topOffset;
+  const leftX = LETTER_LAYOUT.sidePadding;
+  const rightX = pageWidth - LETTER_LAYOUT.sidePadding;
   const contentWidth = rightX - leftX;
-  const minY = 96;
+  const minY = LETTER_LAYOUT.minY;
 
   let y = topY;
-
-  const textWidth = (font, text, size) => font.widthOfTextAtSize(text, size);
 
   const newTemplatePage = async () => {
     const [copied] = await pdfDoc.copyPages(letterheadDoc, [0]);
@@ -210,285 +57,286 @@ export const generateProbationOfferLetterPdfBuffer = async (
     }
   };
 
-  const drawLineRich = async (line, size, lineHeight, fontPicker) => {
-    if (line.length === 0) return;
-
-    await ensureSpace(lineHeight);
-    let cursorX = leftX;
-
-    for (const segment of line) {
-      const segmentFont = fontPicker(segment.style);
-      const segmentWidth = textWidth(segmentFont, segment.text, size);
-
-      page.drawText(segment.text, {
-        x: cursorX,
-        y,
-        size,
-        font: segmentFont,
-      });
-
-      if (segment.style.underline) {
-        page.drawLine({
-          start: { x: cursorX, y: y - 1.5 },
-          end: { x: cursorX + segmentWidth, y: y - 1.5 },
-          thickness: 0.8,
-        });
-      }
-
-      cursorX += segmentWidth;
-    }
-
-    y -= lineHeight;
-  };
-
   const drawParagraph = async (
     text,
-    size = TYPOGRAPHY.bodySize,
-    lineGap = TYPOGRAPHY.bodyLineGap
-  ) => {
-    const lineHeight = size + lineGap;
-    const tokens = parseRichText(text);
-    const currentLine = [];
-    let currentLineWidth = 0;
-
-    const fontForStyle = (styleInfo) => {
-      if (styleInfo.bold && styleInfo.italic) return helveticaBoldItalic;
-      if (styleInfo.bold) return helveticaBold;
-      if (styleInfo.italic) return helveticaItalic;
-      return helvetica;
-    };
-
-    const flushLine = async () => {
-      await drawLineRich(currentLine, size, lineHeight, fontForStyle);
-      currentLine.length = 0;
-      currentLineWidth = 0;
-    };
-
-    const pushChunk = async (chunk, styleInfo) => {
-      if (!chunk) return;
-      if (/^\s+$/.test(chunk) && currentLine.length === 0) return;
-
-      const chunkFont = fontForStyle(styleInfo);
-      const chunkWidth = textWidth(chunkFont, chunk, size);
-
-      if (
-        !/^\s+$/.test(chunk) &&
-        currentLineWidth + chunkWidth > contentWidth &&
-        currentLine.length > 0
-      ) {
-        await flushLine();
-      }
-
-      if (!/^\s+$/.test(chunk) && chunkWidth > contentWidth) {
-        let buffer = '';
-        for (const char of chunk) {
-          const candidate = `${buffer}${char}`;
-          const candidateWidth = textWidth(chunkFont, candidate, size);
-          if (candidateWidth > contentWidth && buffer) {
-            currentLine.push({ text: buffer, style: styleInfo });
-            currentLineWidth += textWidth(chunkFont, buffer, size);
-            await flushLine();
-            buffer = char;
-          } else {
-            buffer = candidate;
-          }
-        }
-
-        if (buffer) {
-          currentLine.push({ text: buffer, style: styleInfo });
-          currentLineWidth += textWidth(chunkFont, buffer, size);
-        }
-        return;
-      }
-
-      currentLine.push({ text: chunk, style: styleInfo });
-      currentLineWidth += chunkWidth;
-    };
-
-    for (const token of tokens) {
-      if (token.type === 'newline') {
-        await flushLine();
-        continue;
-      }
-
-      const chunks = token.text.split(/(\s+)/).filter((c) => c.length > 0);
-      for (const chunk of chunks) {
-        await pushChunk(chunk, token.style);
-      }
-    }
-
-    await flushLine();
-
-    if (y - TYPOGRAPHY.paragraphSpacing >= minY) {
-      y -= TYPOGRAPHY.paragraphSpacing;
-    }
-  };
-
-  const drawSimpleLine = async (text, font = helvetica, size = TYPOGRAPHY.bodySize, indent = 0) => {
-    const lineHeight = size + TYPOGRAPHY.bodyLineGap;
-    await ensureSpace(lineHeight);
-    page.drawText(String(text || ''), {
-      x: leftX + indent,
-      y,
+    size = TYPOGRAPHY.body.size,
+    lineGap = TYPOGRAPHY.body.lineGap
+  ) =>
+    drawRichParagraph({
+      text,
+      parseRichText,
+      leftX,
+      contentWidth,
       size,
-      font,
-    });
-    y -= lineHeight;
-  };
-
-  const drawBulletLabelValue = async (label, value, valueBold = false) => {
-    const labelText = `• ${label}: `;
-    const valueText = String(value || '');
-    const labelFont = helveticaBold;
-    const valueFont = valueBold ? helveticaBold : helvetica;
-    const lineHeight = TYPOGRAPHY.bodySize + TYPOGRAPHY.bodyLineGap;
-
-    await ensureSpace(lineHeight);
-
-    page.drawText(labelText, {
-      x: leftX,
-      y,
-      size: TYPOGRAPHY.bodySize,
-      font: labelFont,
+      lineGap,
+      paragraphSpacing: TYPOGRAPHY.paragraphSpacing,
+      minY,
+      fonts: {
+        regular: regularFont,
+        bold: boldFont,
+        italic: italicFont,
+        boldItalic: boldItalicFont,
+      },
+      pageAccess: {
+        getPage: () => page,
+        getY: () => y,
+        setY: (nextY) => {
+          y = nextY;
+        },
+        ensureSpace,
+      },
     });
 
-    page.drawText(valueText, {
-      x: leftX + textWidth(labelFont, labelText, TYPOGRAPHY.bodySize),
-      y,
-      size: TYPOGRAPHY.bodySize,
-      font: valueFont,
-    });
-
-    y -= lineHeight;
-  };
-
-  const title = 'PROBATION- OFFER LETTER';
-  const titleWidth = textWidth(helveticaBold, title, TYPOGRAPHY.headingSize);
+  const title = payload.title || 'PROBATION- OFFER LETTER';
+  const titleWidth = textWidth(boldFont, title, TYPOGRAPHY.heading1.size);
   await ensureSpace(58);
   page.drawText(title, {
     x: (pageWidth - titleWidth) / 2,
     y,
-    size: TYPOGRAPHY.headingSize,
-    font: helveticaBold,
+    size: TYPOGRAPHY.heading1.size,
+    font: boldFont,
   });
   y -= 40;
 
-  const issueDate = formatIssueDate(payload.issueDate || issuedAt);
-  const issueWidth = textWidth(helveticaBold, issueDate, TYPOGRAPHY.issueSize);
-  page.drawText(issueDate, {
+  const issueLabel = formatIssueDate(payload.issueDate || issuedAt);
+  const issueWidth = textWidth(boldFont, issueLabel, TYPOGRAPHY.bodyHighlighted.size);
+  page.drawText(issueLabel, {
     x: rightX - issueWidth,
     y,
-    size: TYPOGRAPHY.issueSize,
-    font: helveticaBold,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    font: boldFont,
   });
   y -= 30;
 
-  await drawSimpleLine(`Dear ${payload.employeeName},`, helveticaBold, TYPOGRAPHY.greetingSize);
-  y -= 2;
+  await drawSimpleLine({
+    text: payload.greeting || `Dear ${payload.employeeName || 'Employee'},`,
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
 
-  await drawSimpleLine('Congratulations!', helveticaBold, 13, 26);
+  y -= 10;
 
+  await drawSimpleLine({
+    text: 'Congratulations!',
+    font: boldFont,
+    size: 13,
+    indent: 26,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
+
+  const companyName = payload.companyName || COMPANY_NAME;
   const introParagraph =
-    typeof payload.introParagraph === 'string' ? payload.introParagraph.trim() : '';
-  if (introParagraph) {
-    await drawParagraph(introParagraph);
-  }
+    typeof payload.introParagraph === 'string' && payload.introParagraph.trim()
+      ? payload.introParagraph.trim()
+      : PROBATION_OFFER_LETTER_DEFAULT_INTRO_PARAGRAPH.replace(
+          '[Position Title]',
+          payload.positionTitle || payload.jobTitle || 'Intern'
+        )
+          .replace('[Start Date]', payload.startDate || 'the stated start date')
+          .replace('[Probation Period]', payload.probationPeriod || 'the stated probation period');
 
-  await drawSimpleLine(
-    'Below are the key details of your probationary appointment:',
-    helvetica,
-    TYPOGRAPHY.bodySize
-  );
-  y -= 2;
+  await drawParagraph(introParagraph);
+
+  const keyDetailsTitle =
+    typeof payload.keyDetailsTitle === 'string' && payload.keyDetailsTitle.trim()
+      ? payload.keyDetailsTitle.trim()
+      : 'Below are the key details of your probationary appointment:';
+  await drawSimpleLine({
+    text: keyDetailsTitle,
+    font: regularFont,
+    size: TYPOGRAPHY.body.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
 
   const keyTerms = [
-    { label: 'Position Title', value: payload.positionTitle || payload.jobTitle, bold: true },
-    { label: 'Start Date', value: payload.startDate, bold: true },
-    { label: 'Probation Period', value: payload.probationPeriod, bold: true },
-    { label: 'Reporting Manager', value: payload.reportingManager, bold: true },
-    { label: 'Monthly Salary', value: payload.monthlySalary, bold: true },
-    { label: 'Work Location', value: payload.workLocation, bold: true },
-    { label: 'Employment', value: payload.employmentType || 'Full-Time', bold: true },
-    { label: 'Acceptance Deadline', value: payload.acceptanceDeadline, bold: true },
+    { label: 'Position Title', value: payload.positionTitle || payload.jobTitle },
+    { label: 'Start Date', value: payload.startDate },
+    { label: 'Probation Period', value: payload.probationPeriod },
+    { label: 'Reporting Manager', value: payload.reportingManager },
+    { label: 'Monthly Salary', value: payload.monthlySalary },
+    { label: 'Work Location', value: payload.workLocation || payload.location },
+    { label: 'Employment', value: payload.employmentType || 'Full-Time' },
+    { label: 'Acceptance Deadline', value: payload.acceptanceDeadline },
   ];
 
   for (const term of keyTerms) {
     if (term.value === undefined || term.value === null || String(term.value).trim() === '') {
       continue;
     }
-    await drawBulletLabelValue(term.label, term.value, term.bold);
+
+    await drawBulletLabelValue({
+      label: term.label,
+      value: term.value,
+      valueBold: false,
+      indent: 5,
+      leftX,
+      size: TYPOGRAPHY.bodyHighlighted.size,
+      lineGap: TYPOGRAPHY.body.lineGap,
+      labelFont: boldFont,
+      valueFont: regularFont,
+      valueFontBold: boldFont,
+      pageAccess: {
+        getPage: () => page,
+        getY: () => y,
+        setY: (nextY) => {
+          y = nextY;
+        },
+        ensureSpace,
+      },
+    });
   }
 
-  y -= TYPOGRAPHY.sectionSpacing;
+  y -= TYPOGRAPHY.paragraphSpacing;
 
-  const paragraphs = normalizeParagraphs(payload);
+  const paragraphs = normalizeParagraphsWithDefaults(payload, PROBATION_OFFER_LETTER_DEFAULT_PARAGRAPHS);
   for (const paragraph of paragraphs) {
     await drawParagraph(paragraph);
   }
 
-  const contactParagraph =
-    typeof payload.contactParagraph === 'string' ? payload.contactParagraph.trim() : '';
+  const contactParagraph = typeof payload.contactParagraph === 'string' ? payload.contactParagraph.trim() : '';
   if (contactParagraph) {
     await drawParagraph(contactParagraph);
   }
-
-  y -= 2;
-  await drawSimpleLine('Sincerely,', helveticaBold, TYPOGRAPHY.greetingSize);
-  y -= 18;
 
   const signatureImage = await loadSignatureImage(
     pdfDoc,
     payload.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL
   );
 
+  let signatureDrawHeight = 0;
   if (signatureImage) {
-    const maxW = 120;
-    const maxH = 42;
-    const ratio = Math.min(maxW / signatureImage.width, maxH / signatureImage.height);
-    const drawW = signatureImage.width * ratio;
-    const drawH = signatureImage.height * ratio;
-
-    await ensureSpace(drawH + 85);
-    page.drawImage(signatureImage, {
-      x: leftX,
-      y: y - drawH + 10,
-      width: drawW,
-      height: drawH,
-    });
-    y -= drawH + 8;
-  } else {
-    await ensureSpace(85);
-    y -= 40;
+    const maxWidth = LETTER_LAYOUT.signatureImage.maxWidth;
+    const maxHeight = LETTER_LAYOUT.signatureImage.maxHeight;
+    const ratio = Math.min(maxWidth / signatureImage.width, maxHeight / signatureImage.height);
+    signatureDrawHeight = signatureImage.height * ratio;
   }
 
-  const signerY = y;
-  await drawSimpleLine(
-    payload.signatoryName || 'Authorized Signatory',
-    helveticaBold,
-    TYPOGRAPHY.signatureNameSize
-  );
-  await drawSimpleLine(payload.position || 'Position', helveticaBold, TYPOGRAPHY.signatureMetaSize);
-  await drawSimpleLine(COMPANY_NAME, helveticaBold, TYPOGRAPHY.signatureMetaSize);
+  const closingLineHeight = TYPOGRAPHY.bodyHighlighted.size + TYPOGRAPHY.body.lineGap;
+  const signatureNameHeight = TYPOGRAPHY.bodyHighlighted.size + TYPOGRAPHY.body.lineGap;
+  const signatureMetaHeight = TYPOGRAPHY.body.size + TYPOGRAPHY.body.lineGap;
+  const signatureLeadGap = 24;
+  const signatureImageGap = signatureDrawHeight ? 4 : 0;
+  const signatureBlockHeight =
+    2 +
+    closingLineHeight +
+    signatureLeadGap +
+    signatureDrawHeight +
+    signatureImageGap +
+    signatureNameHeight +
+    signatureMetaHeight +
+    signatureMetaHeight;
 
-  // Candidate acceptance block on the right side like the provided format.
-  const rightBlockX = pageWidth * 0.64;
-  page.drawText('Signature:', {
-    x: rightBlockX,
-    y: signerY,
-    size: TYPOGRAPHY.signatureMetaSize,
-    font: helveticaBold,
+  await ensureSpace(signatureBlockHeight);
+
+  y -= 2;
+  await drawSimpleLine({
+    text: payload.closingText || 'Warm Regards,',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
   });
-  page.drawText('Name:', {
-    x: rightBlockX,
-    y: signerY - 24,
-    size: TYPOGRAPHY.signatureMetaSize,
-    font: helveticaBold,
+
+  y -= signatureLeadGap;
+
+  if (signatureImage) {
+    const maxWidth = LETTER_LAYOUT.signatureImage.maxWidth;
+    const maxHeight = LETTER_LAYOUT.signatureImage.maxHeight;
+    const ratio = Math.min(maxWidth / signatureImage.width, maxHeight / signatureImage.height);
+    const drawWidth = signatureImage.width * ratio;
+
+    page.drawImage(signatureImage, {
+      x: leftX,
+      y: y - signatureDrawHeight + 10,
+      width: drawWidth,
+      height: signatureDrawHeight,
+    });
+
+    y -= signatureDrawHeight + 4;
+  }
+
+  await drawSimpleLine({
+    text: payload.signatoryName || 'Sahil Jaiswal',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
   });
-  page.drawText('Date:', {
-    x: rightBlockX,
-    y: signerY - 48,
-    size: TYPOGRAPHY.signatureMetaSize,
-    font: helveticaBold,
+
+  await drawSimpleLine({
+    text: payload.position || 'CEO & Founder',
+    font: regularFont,
+    size: TYPOGRAPHY.body.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
+
+  await drawSimpleLine({
+    text: payload.companyName || companyName,
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
   });
 
   const bytes = await pdfDoc.save();

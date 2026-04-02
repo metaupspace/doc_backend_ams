@@ -1,150 +1,38 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { PDFDocument } from 'pdf-lib';
+import { COMPANY_NAME } from '../../config/commonDetail.config.ts';
 import {
   CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL,
+  RELIEVING_LETTER_DEFAULT_INTRO_PARAGRAPH,
   RELIEVING_LETTER_DEFAULT_PARAGRAPHS,
 } from '../../config/document.config.ts';
+import { LETTER_LAYOUT } from '../../config/letterLayout.config.ts';
+import { TYPOGRAPHY } from '../../config/typography.config.ts';
+import { embedDMSansFonts } from '../../utils/fontLoader.util.ts';
+import { formatIssueDate } from '../../utils/formatIssueDate.util.ts';
+import { loadSignatureImage } from '../../utils/loadSignatureImage.util.ts';
+import { parseRichText } from '../../utils/parseRichText.util.ts';
+import { drawSimpleLine } from '../../utils/pdfLineLayout.util.ts';
+import { drawRichParagraph, textWidth } from '../../utils/pdfTextLayout.util.ts';
+import { normalizeParagraphsWithDefaults } from '../../utils/paragraphs.util.ts';
 
-const COMPANY_NAME = 'MetaUpSpace LLP';
+const resolveRelievingTemplate = (template, payload, companyName) => {
+  const employeeName = payload.employeeName || '[Employee_Name]';
+  const employeeNo = payload.employeeNo || '[EMP No ]';
+  const jobTitle = payload.jobTitle || payload.designation || '[Job_Ttle]';
+  const department = payload.department || '[Job_Department]';
+  const joiningDate = payload.joiningDate || '[Joining_Date]';
+  const lastDay = payload.lastDay || payload.lastWorkingDate || '[Last_Day]';
 
-const TYPOGRAPHY = {
-  headingSize: 24,
-  bodySize: 11,
-  bodyLineGap: 6,
-  greetingSize: 12,
-  issueSize: 11,
-  paragraphSpacing: 7,
-  signatureNameSize: 12,
-  signatureMetaSize: 11,
-};
-
-const formatIssueDate = (value) => {
-  const d = value ? new Date(value) : new Date();
-  if (Number.isNaN(d.getTime())) {
-    return new Date().toLocaleDateString('en-GB');
-  }
-  return d.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-};
-
-const decodeHtmlEntities = (text) => {
-  return String(text)
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-};
-
-const parseRichText = (htmlLikeText) => {
-  const input = String(htmlLikeText || '');
-  const parts = input.split(/(<[^>]+>)/g).filter(Boolean);
-  const tokens = [];
-
-  const style = { bold: false, italic: false, underline: false };
-
-  const pushText = (value) => {
-    const decoded = decodeHtmlEntities(value);
-    if (!decoded) return;
-    tokens.push({
-      type: 'text',
-      text: decoded,
-      style: {
-        bold: style.bold,
-        italic: style.italic,
-        underline: style.underline,
-      },
-    });
-  };
-
-  for (const part of parts) {
-    if (!part.startsWith('<')) {
-      pushText(part);
-      continue;
-    }
-
-    const tag = part.toLowerCase().replace(/\s+/g, '');
-    if (tag === '<br>' || tag === '<br/>' || tag === '<br/ >') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-    if (tag === '<p>' || tag === '<div>') continue;
-    if (tag === '</p>' || tag === '</div>') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-    if (tag === '<li>') {
-      pushText('• ');
-      continue;
-    }
-    if (tag === '</li>') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-    if (tag === '<b>' || tag === '<strong>') {
-      style.bold = true;
-      continue;
-    }
-    if (tag === '</b>' || tag === '</strong>') {
-      style.bold = false;
-      continue;
-    }
-    if (tag === '<i>' || tag === '<em>') {
-      style.italic = true;
-      continue;
-    }
-    if (tag === '</i>' || tag === '</em>') {
-      style.italic = false;
-      continue;
-    }
-    if (tag === '<u>') {
-      style.underline = true;
-      continue;
-    }
-    if (tag === '</u>') {
-      style.underline = false;
-      continue;
-    }
-  }
-
-  return tokens;
-};
-
-const normalizeParagraphs = (payload) => {
-  const inputParagraphs = Array.isArray(payload.paragraphs)
-    ? payload.paragraphs.filter(Boolean)
-    : [payload.paragraph1, payload.paragraph2].filter(Boolean);
-
-  if (inputParagraphs.length > 0) {
-    return inputParagraphs;
-  }
-
-  return [...RELIEVING_LETTER_DEFAULT_PARAGRAPHS];
-};
-
-const loadSignatureImage = async (pdfDoc, signatureUrl) => {
-  if (!signatureUrl || typeof signatureUrl !== 'string') {
-    return null;
-  }
-
-  try {
-    const response = await fetch(signatureUrl);
-    if (!response.ok) return null;
-    const imageBytes = await response.arrayBuffer();
-    const contentType = response.headers.get('content-type') || '';
-
-    if (contentType.includes('png')) return pdfDoc.embedPng(imageBytes);
-    if (contentType.includes('jpeg') || contentType.includes('jpg'))
-      return pdfDoc.embedJpg(imageBytes);
-    return null;
-  } catch {
-    return null;
-  }
+  return String(template)
+    .replace(/MetaUpSpace LLP/g, companyName)
+    .replace('[Employee_Name]', employeeName)
+    .replace('[EMP No ]', employeeNo)
+    .replace('[Job_Ttle]', jobTitle)
+    .replace('[Job_Department]', department)
+    .replace('[Joining_Date]', joiningDate)
+    .replace('[Last_Day]', lastDay);
 };
 
 export const generateRelievingLetterPdfBuffer = async (
@@ -160,21 +48,20 @@ export const generateRelievingLetterPdfBuffer = async (
   const [templatePage] = await pdfDoc.copyPages(letterheadDoc, [0]);
   let page = pdfDoc.addPage(templatePage);
 
-  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const helveticaItalic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
-  const helveticaBoldItalic = await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
+  const fonts = await embedDMSansFonts(pdfDoc);
+  const regularFont = fonts.regular;
+  const boldFont = fonts.bold;
+  const italicFont = fonts.italic;
+  const boldItalicFont = fonts.boldItalic;
 
   const pageWidth = page.getWidth();
-  const topY = page.getHeight() - 160;
-  const leftX = 34;
-  const rightX = pageWidth - 34;
+  const topY = page.getHeight() - LETTER_LAYOUT.topOffset;
+  const leftX = LETTER_LAYOUT.sidePadding;
+  const rightX = pageWidth - LETTER_LAYOUT.sidePadding;
   const contentWidth = rightX - leftX;
-  const minY = 96;
+  const minY = LETTER_LAYOUT.minY;
 
   let y = topY;
-
-  const textWidth = (font, text, size) => font.widthOfTextAtSize(text, size);
 
   const newTemplatePage = async () => {
     const [copied] = await pdfDoc.copyPages(letterheadDoc, [0]);
@@ -188,185 +75,201 @@ export const generateRelievingLetterPdfBuffer = async (
     }
   };
 
-  const drawLineRich = async (line, size, lineHeight, fontPicker) => {
-    if (line.length === 0) return;
-    await ensureSpace(lineHeight);
-    let cursorX = leftX;
-
-    for (const segment of line) {
-      const segmentFont = fontPicker(segment.style);
-      const segmentWidth = textWidth(segmentFont, segment.text, size);
-
-      page.drawText(segment.text, { x: cursorX, y, size, font: segmentFont });
-
-      if (segment.style.underline) {
-        page.drawLine({
-          start: { x: cursorX, y: y - 1.5 },
-          end: { x: cursorX + segmentWidth, y: y - 1.5 },
-          thickness: 0.8,
-        });
-      }
-
-      cursorX += segmentWidth;
-    }
-
-    y -= lineHeight;
-  };
-
   const drawParagraph = async (
     text,
-    size = TYPOGRAPHY.bodySize,
-    lineGap = TYPOGRAPHY.bodyLineGap
-  ) => {
-    const lineHeight = size + lineGap;
-    const tokens = parseRichText(text);
-    const currentLine = [];
-    let currentLineWidth = 0;
+    size = TYPOGRAPHY.body.size,
+    lineGap = TYPOGRAPHY.body.lineGap
+  ) =>
+    drawRichParagraph({
+      text,
+      parseRichText,
+      leftX,
+      contentWidth,
+      size,
+      lineGap,
+      paragraphSpacing: TYPOGRAPHY.paragraphSpacing,
+      minY,
+      fonts: {
+        regular: regularFont,
+        bold: boldFont,
+        italic: italicFont,
+        boldItalic: boldItalicFont,
+      },
+      pageAccess: {
+        getPage: () => page,
+        getY: () => y,
+        setY: (nextY) => {
+          y = nextY;
+        },
+        ensureSpace,
+      },
+    });
 
-    const fontForStyle = (styleInfo) => {
-      if (styleInfo.bold && styleInfo.italic) return helveticaBoldItalic;
-      if (styleInfo.bold) return helveticaBold;
-      if (styleInfo.italic) return helveticaItalic;
-      return helvetica;
-    };
-
-    const flushLine = async () => {
-      await drawLineRich(currentLine, size, lineHeight, fontForStyle);
-      currentLine.length = 0;
-      currentLineWidth = 0;
-    };
-
-    const pushChunk = async (chunk, styleInfo) => {
-      if (!chunk) return;
-      if (/^\s+$/.test(chunk) && currentLine.length === 0) return;
-
-      const chunkFont = fontForStyle(styleInfo);
-      const chunkWidth = textWidth(chunkFont, chunk, size);
-
-      if (
-        !/^\s+$/.test(chunk) &&
-        currentLineWidth + chunkWidth > contentWidth &&
-        currentLine.length > 0
-      ) {
-        await flushLine();
-      }
-
-      currentLine.push({ text: chunk, style: styleInfo });
-      currentLineWidth += chunkWidth;
-    };
-
-    for (const token of tokens) {
-      if (token.type === 'newline') {
-        await flushLine();
-        continue;
-      }
-
-      const chunks = token.text.split(/(\s+)/).filter((c) => c.length > 0);
-      for (const chunk of chunks) {
-        await pushChunk(chunk, token.style);
-      }
-    }
-
-    await flushLine();
-
-    if (y - TYPOGRAPHY.paragraphSpacing >= minY) {
-      y -= TYPOGRAPHY.paragraphSpacing;
-    }
-  };
-
-  const drawSimpleLine = async (text, font = helvetica, size = TYPOGRAPHY.bodySize, indent = 0) => {
-    const lineHeight = size + TYPOGRAPHY.bodyLineGap;
-    await ensureSpace(lineHeight);
-    page.drawText(String(text || ''), { x: leftX + indent, y, size, font });
-    y -= lineHeight;
-  };
-
-  const title = 'RELIEVING LETTER';
-  const titleWidth = textWidth(helveticaBold, title, TYPOGRAPHY.headingSize);
+  const title = payload.title || 'RELIEVING LETTER';
+  const titleWidth = textWidth(boldFont, title, TYPOGRAPHY.heading1.size);
   await ensureSpace(58);
   page.drawText(title, {
     x: (pageWidth - titleWidth) / 2,
     y,
-    size: TYPOGRAPHY.headingSize,
-    font: helveticaBold,
+    size: TYPOGRAPHY.heading1.size,
+    font: boldFont,
   });
   y -= 40;
 
-  const issueLabel = `[Date of Issuance: ${formatIssueDate(payload.issueDate || issuedAt)}]`;
-  const issueWidth = textWidth(helveticaBold, issueLabel, TYPOGRAPHY.issueSize);
-  page.drawText(issueLabel, {
+  const issueText = payload.issueDate || issuedAt ? formatIssueDate(payload.issueDate || issuedAt) : '[Date of Issuance]';
+  const issueWidth = textWidth(boldFont, issueText, TYPOGRAPHY.bodyHighlighted.size);
+  page.drawText(issueText, {
     x: rightX - issueWidth,
     y,
-    size: TYPOGRAPHY.issueSize,
-    font: helveticaBold,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    font: boldFont,
   });
   y -= 30;
 
-  await drawSimpleLine(
-    payload.greeting || 'To Whomsoever Concerned,',
-    helveticaBold,
-    TYPOGRAPHY.greetingSize
-  );
+  await drawSimpleLine({
+    text: payload.greeting || 'To Whomsoever Concerned,',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
+
   y -= 10;
 
+  const companyName = payload.companyName || COMPANY_NAME;
   const introParagraph =
     typeof payload.introParagraph === 'string' && payload.introParagraph.trim()
       ? payload.introParagraph.trim()
-      : `We hereby certify that ${payload.employeeName || '[Employee_Name]'}${
-          payload.employeeNo ? `, ${payload.employeeNo}` : ''
-        } was employed as a ${payload.jobTitle || '[Job_Title]'} in ${
-          payload.department || '[Job_Department]'
-        } with ${payload.companyName || COMPANY_NAME} starting from ${
-          payload.joiningDate || '[Joining_Date]'
-        } to ${payload.lastDay || payload.lastWorkingDate || '[Last_Day]'}.`;
+      : resolveRelievingTemplate(RELIEVING_LETTER_DEFAULT_INTRO_PARAGRAPH, payload, companyName);
 
   await drawParagraph(introParagraph);
 
-  const paragraphs = normalizeParagraphs(payload);
+  const paragraphs = normalizeParagraphsWithDefaults(payload, RELIEVING_LETTER_DEFAULT_PARAGRAPHS).map(
+    (paragraph) => resolveRelievingTemplate(paragraph, payload, companyName)
+  );
+
   for (const paragraph of paragraphs) {
     await drawParagraph(paragraph);
   }
 
   y -= 4;
-  await drawSimpleLine(payload.closingText || 'Sincerely,', helveticaBold, TYPOGRAPHY.greetingSize);
-  y -= 24;
+  await drawSimpleLine({
+    text: payload.closingText || 'Sincerely,',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
 
   const signatureImage = await loadSignatureImage(
     pdfDoc,
     payload.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL
   );
 
+  let signatureDrawHeight = 0;
   if (signatureImage) {
-    const maxW = 120;
-    const maxH = 42;
-    const ratio = Math.min(maxW / signatureImage.width, maxH / signatureImage.height);
-    const drawW = signatureImage.width * ratio;
-    const drawH = signatureImage.height * ratio;
-
-    await ensureSpace(drawH + 75);
-    page.drawImage(signatureImage, {
-      x: leftX,
-      y: y - drawH + 10,
-      width: drawW,
-      height: drawH,
-    });
-    y -= drawH + 8;
-  } else {
-    await ensureSpace(75);
-    y -= 35;
+    const maxWidth = LETTER_LAYOUT.signatureImage.maxWidth;
+    const maxHeight = LETTER_LAYOUT.signatureImage.maxHeight;
+    const ratio = Math.min(maxWidth / signatureImage.width, maxHeight / signatureImage.height);
+    signatureDrawHeight = signatureImage.height * ratio;
   }
 
-  await drawSimpleLine(
-    payload.signatoryName || 'Authorized Signatory',
-    helveticaBold,
-    TYPOGRAPHY.signatureNameSize
-  );
-  await drawSimpleLine(payload.position || 'Position', helveticaBold, TYPOGRAPHY.signatureMetaSize);
-  await drawSimpleLine(
-    payload.companyName || COMPANY_NAME,
-    helveticaBold,
-    TYPOGRAPHY.signatureMetaSize
-  );
+  const closingLineHeight = TYPOGRAPHY.bodyHighlighted.size + TYPOGRAPHY.body.lineGap;
+  const signatureNameHeight = TYPOGRAPHY.bodyHighlighted.size + TYPOGRAPHY.body.lineGap;
+  const signatureMetaHeight = TYPOGRAPHY.body.size + TYPOGRAPHY.body.lineGap;
+  const signatureLeadGap = 24;
+  const signatureImageGap = signatureDrawHeight ? 4 : 0;
+  const signatureBlockHeight =
+    4 +
+    closingLineHeight +
+    signatureLeadGap +
+    signatureDrawHeight +
+    signatureImageGap +
+    signatureNameHeight +
+    signatureMetaHeight +
+    signatureMetaHeight;
+
+  await ensureSpace(signatureBlockHeight);
+
+  y -= signatureLeadGap;
+
+  if (signatureImage) {
+    const maxWidth = LETTER_LAYOUT.signatureImage.maxWidth;
+    const maxHeight = LETTER_LAYOUT.signatureImage.maxHeight;
+    const ratio = Math.min(maxWidth / signatureImage.width, maxHeight / signatureImage.height);
+    const drawWidth = signatureImage.width * ratio;
+
+    page.drawImage(signatureImage, {
+      x: leftX,
+      y: y - signatureDrawHeight + 10,
+      width: drawWidth,
+      height: signatureDrawHeight,
+    });
+
+    y -= signatureDrawHeight + 4;
+  }
+
+  await drawSimpleLine({
+    text: payload.signatoryName || 'Sahil Jaiswal',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
+  await drawSimpleLine({
+    text: payload.position || 'CEO & Founder',
+    font: boldFont,
+    size: TYPOGRAPHY.body.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
+  await drawSimpleLine({
+    text: payload.signatoryCompany || companyName,
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
 
   const bytes = await pdfDoc.save();
   return Buffer.from(bytes);

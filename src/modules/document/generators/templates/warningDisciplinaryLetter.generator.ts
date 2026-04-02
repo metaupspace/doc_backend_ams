@@ -1,149 +1,50 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { PDFDocument } from 'pdf-lib';
+import { COMPANY_NAME } from '../../config/commonDetail.config.ts';
 import {
   CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL,
+  WARNING_DISCIPLINARY_LETTER_DEFAULT_INTRO_PARAGRAPH,
   WARNING_DISCIPLINARY_LETTER_DEFAULT_PARAGRAPHS,
 } from '../../config/document.config.ts';
+import { LETTER_LAYOUT } from '../../config/letterLayout.config.ts';
+import { TYPOGRAPHY } from '../../config/typography.config.ts';
+import { embedDMSansFonts } from '../../utils/fontLoader.util.ts';
+import { formatIssueDate } from '../../utils/formatIssueDate.util.ts';
+import { loadSignatureImage } from '../../utils/loadSignatureImage.util.ts';
+import { parseRichText } from '../../utils/parseRichText.util.ts';
+import { drawSimpleLine } from '../../utils/pdfLineLayout.util.ts';
+import { drawRichParagraph, textWidth } from '../../utils/pdfTextLayout.util.ts';
+import { normalizeParagraphsWithDefaults } from '../../utils/paragraphs.util.ts';
 
-const COMPANY_NAME = 'MetaUpSpace LLP';
-
-const TYPOGRAPHY = {
-  headingSize: 24,
-  bodySize: 11,
-  bodyLineGap: 6,
-  greetingSize: 12,
-  issueSize: 11,
-  paragraphSpacing: 7,
-  signatureNameSize: 12,
-  signatureMetaSize: 11,
+const WARNING_DISCIPLINARY_SPACING = {
+  sectionBlockGap: 8,
+  bulletLineGap: 7,
+  bulletParagraphSpacing: 2,
+  closingTopGap: 8,
+  acknowledgementGapAfterSignBlock: 150,
+  acknowledgementMinStartY: 190,
+  acknowledgementLineTopGap: 30,
 };
 
-const formatIssueDate = (value) => {
-  const d = value ? new Date(value) : new Date();
-  if (Number.isNaN(d.getTime())) {
-    return new Date().toLocaleDateString('en-GB');
+const resolveIssueText = (issueDate, issuedAt) => {
+  if (typeof issueDate === 'string' && issueDate.trim()) {
+    return issueDate.trim();
   }
-  return d.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-};
-
-const decodeHtmlEntities = (text) => {
-  return String(text)
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-};
-
-const parseRichText = (htmlLikeText) => {
-  const input = String(htmlLikeText || '');
-  const parts = input.split(/(<[^>]+>)/g).filter(Boolean);
-  const tokens = [];
-
-  const style = { bold: false, italic: false, underline: false };
-
-  const pushText = (value) => {
-    const decoded = decodeHtmlEntities(value);
-    if (!decoded) return;
-    tokens.push({
-      type: 'text',
-      text: decoded,
-      style: {
-        bold: style.bold,
-        italic: style.italic,
-        underline: style.underline,
-      },
-    });
-  };
-
-  for (const part of parts) {
-    if (!part.startsWith('<')) {
-      pushText(part);
-      continue;
-    }
-
-    const tag = part.toLowerCase().replace(/\s+/g, '');
-    if (tag === '<br>' || tag === '<br/>' || tag === '<br/ >') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-    if (tag === '<p>' || tag === '<div>') continue;
-    if (tag === '</p>' || tag === '</div>') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-    if (tag === '<li>') {
-      pushText('• ');
-      continue;
-    }
-    if (tag === '</li>') {
-      tokens.push({ type: 'newline' });
-      continue;
-    }
-    if (tag === '<b>' || tag === '<strong>') {
-      style.bold = true;
-      continue;
-    }
-    if (tag === '</b>' || tag === '</strong>') {
-      style.bold = false;
-      continue;
-    }
-    if (tag === '<i>' || tag === '<em>') {
-      style.italic = true;
-      continue;
-    }
-    if (tag === '</i>' || tag === '</em>') {
-      style.italic = false;
-      continue;
-    }
-    if (tag === '<u>') {
-      style.underline = true;
-      continue;
-    }
-    if (tag === '</u>') {
-      style.underline = false;
-      continue;
-    }
+  if (issueDate || issuedAt) {
+    return formatIssueDate(issueDate || issuedAt);
   }
-
-  return tokens;
+  return '[Date of Issuance]';
 };
 
-const normalizeParagraphs = (payload) => {
-  const inputParagraphs = Array.isArray(payload.paragraphs)
-    ? payload.paragraphs.filter(Boolean)
-    : [payload.paragraph1, payload.paragraph2, payload.paragraph3].filter(Boolean);
-
-  if (inputParagraphs.length > 0) {
-    return inputParagraphs;
-  }
-
-  return [...WARNING_DISCIPLINARY_LETTER_DEFAULT_PARAGRAPHS];
-};
-
-const loadSignatureImage = async (pdfDoc, signatureUrl) => {
-  if (!signatureUrl || typeof signatureUrl !== 'string') {
-    return null;
-  }
-
-  try {
-    const response = await fetch(signatureUrl);
-    if (!response.ok) return null;
-    const imageBytes = await response.arrayBuffer();
-    const contentType = response.headers.get('content-type') || '';
-
-    if (contentType.includes('png')) return pdfDoc.embedPng(imageBytes);
-    if (contentType.includes('jpeg') || contentType.includes('jpg'))
-      return pdfDoc.embedJpg(imageBytes);
-    return null;
-  } catch {
-    return null;
+const drawBullets = async (items, drawParagraph) => {
+  for (const item of items.filter(Boolean)) {
+    await drawParagraph(
+      `• ${item}`,
+      TYPOGRAPHY.body.size,
+      WARNING_DISCIPLINARY_SPACING.bulletLineGap,
+      WARNING_DISCIPLINARY_SPACING.bulletParagraphSpacing
+    );
   }
 };
 
@@ -160,21 +61,20 @@ export const generateWarningDisciplinaryLetterPdfBuffer = async (
   const [templatePage] = await pdfDoc.copyPages(letterheadDoc, [0]);
   let page = pdfDoc.addPage(templatePage);
 
-  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const helveticaItalic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
-  const helveticaBoldItalic = await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
+  const fonts = await embedDMSansFonts(pdfDoc);
+  const regularFont = fonts.regular;
+  const boldFont = fonts.bold;
+  const italicFont = fonts.italic;
+  const boldItalicFont = fonts.boldItalic;
 
   const pageWidth = page.getWidth();
-  const topY = page.getHeight() - 160;
-  const leftX = 34;
-  const rightX = pageWidth - 34;
+  const topY = page.getHeight() - LETTER_LAYOUT.topOffset;
+  const leftX = LETTER_LAYOUT.sidePadding;
+  const rightX = pageWidth - LETTER_LAYOUT.sidePadding;
   const contentWidth = rightX - leftX;
-  const minY = 96;
+  const minY = LETTER_LAYOUT.minY;
 
   let y = topY;
-
-  const textWidth = (font, text, size) => font.widthOfTextAtSize(text, size);
 
   const newTemplatePage = async () => {
     const [copied] = await pdfDoc.copyPages(letterheadDoc, [0]);
@@ -188,147 +88,110 @@ export const generateWarningDisciplinaryLetterPdfBuffer = async (
     }
   };
 
-  const drawLineRich = async (line, size, lineHeight, fontPicker) => {
-    if (line.length === 0) return;
-    await ensureSpace(lineHeight);
-    let cursorX = leftX;
-
-    for (const segment of line) {
-      const segmentFont = fontPicker(segment.style);
-      const segmentWidth = textWidth(segmentFont, segment.text, size);
-
-      page.drawText(segment.text, { x: cursorX, y, size, font: segmentFont });
-
-      if (segment.style.underline) {
-        page.drawLine({
-          start: { x: cursorX, y: y - 1.5 },
-          end: { x: cursorX + segmentWidth, y: y - 1.5 },
-          thickness: 0.8,
-        });
-      }
-
-      cursorX += segmentWidth;
-    }
-
-    y -= lineHeight;
-  };
-
   const drawParagraph = async (
     text,
-    size = TYPOGRAPHY.bodySize,
-    lineGap = TYPOGRAPHY.bodyLineGap
-  ) => {
-    const lineHeight = size + lineGap;
-    const tokens = parseRichText(text);
-    const currentLine = [];
-    let currentLineWidth = 0;
+    size = TYPOGRAPHY.body.size,
+    lineGap = TYPOGRAPHY.body.lineGap,
+    paragraphSpacing = TYPOGRAPHY.paragraphSpacing
+  ) =>
+    drawRichParagraph({
+      text,
+      parseRichText,
+      leftX,
+      contentWidth,
+      size,
+      lineGap,
+      paragraphSpacing,
+      minY,
+      fonts: {
+        regular: regularFont,
+        bold: boldFont,
+        italic: italicFont,
+        boldItalic: boldItalicFont,
+      },
+      pageAccess: {
+        getPage: () => page,
+        getY: () => y,
+        setY: (nextY) => {
+          y = nextY;
+        },
+        ensureSpace,
+      },
+    });
 
-    const fontForStyle = (styleInfo) => {
-      if (styleInfo.bold && styleInfo.italic) return helveticaBoldItalic;
-      if (styleInfo.bold) return helveticaBold;
-      if (styleInfo.italic) return helveticaItalic;
-      return helvetica;
-    };
-
-    const flushLine = async () => {
-      await drawLineRich(currentLine, size, lineHeight, fontForStyle);
-      currentLine.length = 0;
-      currentLineWidth = 0;
-    };
-
-    const pushChunk = async (chunk, styleInfo) => {
-      if (!chunk) return;
-      if (/^\s+$/.test(chunk) && currentLine.length === 0) return;
-
-      const chunkFont = fontForStyle(styleInfo);
-      const chunkWidth = textWidth(chunkFont, chunk, size);
-
-      if (
-        !/^\s+$/.test(chunk) &&
-        currentLineWidth + chunkWidth > contentWidth &&
-        currentLine.length > 0
-      ) {
-        await flushLine();
-      }
-
-      currentLine.push({ text: chunk, style: styleInfo });
-      currentLineWidth += chunkWidth;
-    };
-
-    for (const token of tokens) {
-      if (token.type === 'newline') {
-        await flushLine();
-        continue;
-      }
-
-      const chunks = token.text.split(/(\s+)/).filter((c) => c.length > 0);
-      for (const chunk of chunks) {
-        await pushChunk(chunk, token.style);
-      }
+  const addSectionGap = async () => {
+    if (y - WARNING_DISCIPLINARY_SPACING.sectionBlockGap < minY) {
+      await newTemplatePage();
+      return;
     }
-
-    await flushLine();
-
-    if (y - TYPOGRAPHY.paragraphSpacing >= minY) {
-      y -= TYPOGRAPHY.paragraphSpacing;
-    }
-  };
-
-  const drawSimpleLine = async (text, font = helvetica, size = TYPOGRAPHY.bodySize, indent = 0) => {
-    const lineHeight = size + TYPOGRAPHY.bodyLineGap;
-    await ensureSpace(lineHeight);
-    page.drawText(String(text || ''), { x: leftX + indent, y, size, font });
-    y -= lineHeight;
-  };
-
-  const drawBullets = async (items = []) => {
-    for (const item of items.filter(Boolean)) {
-      await drawParagraph(`• ${item}`, TYPOGRAPHY.bodySize, 4);
-    }
+    y -= WARNING_DISCIPLINARY_SPACING.sectionBlockGap;
   };
 
   const title = payload.title || 'WARNING AND DISCIPLINARY LETTER';
-  const titleWidth = textWidth(helveticaBold, title, TYPOGRAPHY.headingSize);
+  const titleWidth = textWidth(boldFont, title, TYPOGRAPHY.heading1.size);
   await ensureSpace(58);
   page.drawText(title, {
     x: (pageWidth - titleWidth) / 2,
     y,
-    size: TYPOGRAPHY.headingSize,
-    font: helveticaBold,
+    size: TYPOGRAPHY.heading1.size,
+    font: boldFont,
   });
   y -= 40;
 
-  const issueDate = payload.issueDate || issuedAt;
-  const issueText = formatIssueDate(issueDate);
-  const issueWidth = textWidth(helveticaBold, issueText, TYPOGRAPHY.issueSize);
+  const issueText = resolveIssueText(payload.issueDate, issuedAt);
+  const issueWidth = textWidth(boldFont, issueText, TYPOGRAPHY.bodyHighlighted.size);
   page.drawText(issueText, {
     x: rightX - issueWidth,
     y,
-    size: TYPOGRAPHY.issueSize,
-    font: helveticaBold,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    font: boldFont,
   });
   y -= 30;
 
-  await drawSimpleLine(
-    `Dear ${payload.employeeName || `Employee's Name`},`,
-    helveticaBold,
-    TYPOGRAPHY.greetingSize
-  );
+  await drawSimpleLine({
+    text: payload.greeting || `Dear ${payload.employeeName || "Employee's Name"},`,
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
   y -= 10;
 
-  await drawParagraph(
-    payload.introParagraph ||
-      'This letter serves as a formal written warning regarding recent behavior that is not in accordance with the standards, policies, and values of MetaUpSpace LLP.'
-  );
+  const companyName = payload.companyName || COMPANY_NAME;
+  const introParagraph =
+    typeof payload.introParagraph === 'string' && payload.introParagraph.trim()
+      ? payload.introParagraph.trim()
+      : WARNING_DISCIPLINARY_LETTER_DEFAULT_INTRO_PARAGRAPH.replace(/MetaUpSpace LLP/g, companyName);
 
-  await drawSimpleLine(
-    payload.section1Title || '1. Description of Concern',
-    helveticaBold,
-    TYPOGRAPHY.greetingSize
-  );
+  await drawParagraph(introParagraph);
+  await addSectionGap();
+
+  await drawSimpleLine({
+    text: payload.section1Title || '1. Description of Concern',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
   await drawParagraph(
     payload.section1Intro ||
-      'It has been observed that over the past review period, there have been repeated concerns in expected conduct and delivery.'
+      'It has been observed that over the past [insert duration or dates], you have consistently failed to:'
   );
   await drawBullets(
     payload.concernsList || [
@@ -336,154 +199,289 @@ export const generateWarningDisciplinaryLetterPdfBuffer = async (
       'Lack of responsiveness and poor communication with the team',
       'Mark your attendance as per company protocol',
       'Negligence in completing assigned work',
-    ]
+    ],
+    drawParagraph
   );
   await drawParagraph(
     payload.section1Outro ||
-      'This behavior is in direct violation of company policies, as outlined in the Annexure[A].'
+      'This behavior is in direct violation of company policies, as outlined in the <strong><em>Annexure[A]</em></strong>.'
   );
+  await addSectionGap();
 
-  await drawSimpleLine(
-    payload.section2Title || '2. Previous Actions Taken',
-    helveticaBold,
-    TYPOGRAPHY.greetingSize
-  );
+  await drawSimpleLine({
+    text: payload.section2Title || '2. Previous Actions Taken',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
   await drawParagraph(
-    payload.section2Intro ||
-      'Prior to this letter, the following steps were taken to address the concerns:'
+    payload.section2Intro || 'Prior to this letter, the following steps were taken to address the concerns:'
   );
   await drawBullets(
     payload.previousActionsList || [
       '[Insert Date]: Verbal reminder regarding communication and availability',
       '[Insert Date]: Advised via email/chat to be present and responsive during working hours',
-    ]
+    ],
+    drawParagraph
   );
   await drawParagraph(
     payload.section2Outro ||
       'Despite these measures, there has been insufficient or no improvement in your conduct.'
   );
+  await addSectionGap();
 
-  await drawSimpleLine(
-    payload.section3Title || '3. Required Improvement and Expectations',
-    helveticaBold,
-    TYPOGRAPHY.greetingSize
-  );
+  await drawSimpleLine({
+    text: payload.section3Title || '3. Required Improvement and Expectations',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
   await drawParagraph(payload.section3Intro || 'You are expected to:');
   await drawBullets(
     payload.expectationsList || [
       'Be present in the virtual office consistently',
       'Communicate clearly and promptly',
       'Show responsibility in your assigned tasks',
-    ]
+    ],
+    drawParagraph
   );
   await drawParagraph(
     payload.section3Outro ||
-      'This improvement must be immediate and sustained. Your conduct will be closely monitored over the next 30 days.'
+      'This improvement must be <strong>immediate and sustained</strong>. Your conduct will be closely monitored over the next 30 days.'
   );
+  await addSectionGap();
 
-  await drawSimpleLine(
-    payload.section4Title || '4. Consequences of Further Violation',
-    helveticaBold,
-    TYPOGRAPHY.greetingSize
-  );
+  await drawSimpleLine({
+    text: payload.section4Title || '4. Consequences of Further Violation',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
   await drawParagraph(
     payload.section4Intro ||
       'Failure to demonstrate consistent improvement or any recurrence of similar issues may result in:'
   );
   await drawParagraph(
     payload.monetaryPenalty ||
-      'Monetary Penalty: A deduction may be applied to your current or upcoming stipend/compensation based on the impact of your continued non-compliance.'
+      '<strong>Monetary Penalty:</strong> A deduction may be applied to your current or upcoming stipend/compensation based on the impact of your continued non-compliance.'
   );
   await drawParagraph(
     payload.nonMonetaryPenalty ||
-      'Non-Monetary Penalty: This may include temporary removal from ongoing projects, withdrawal of discretionary privileges, or official downgrade of performance status, which will be recorded in your employee profile or, if deemed necessary, termination of employment in accordance with company policies and applicable laws.'
+      '<strong>Non-Monetary Penalty:</strong> This may include temporary removal from ongoing projects, withdrawal of discretionary privileges, or official downgrade of performance status, which will be recorded in your employee profile or, if deemed necessary, termination of employment in accordance with company policies and applicable laws.'
   );
+  await addSectionGap();
 
-  await drawSimpleLine(
-    payload.section5Title || '5. Acknowledgment and Support',
-    helveticaBold,
-    TYPOGRAPHY.greetingSize
-  );
+  await drawSimpleLine({
+    text: payload.section5Title || '5. Acknowledgment and Support',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
   await drawParagraph(
     payload.section5Intro ||
-      'We are committed to supporting your success at MetaUpSpace LLP. If you are experiencing any challenges that may be affecting your performance, you are encouraged to speak with HR directly and confidentially.'
+      'We are committed to supporting your success at MetaUpSpace LLP. If you are experiencing any challenges that may be affecting your performance, you are encouraged to speak with <strong>[Insert HR or manager\'s name]</strong> directly and confidentially.'
   );
 
-  const paragraphs = normalizeParagraphs(payload);
+  const paragraphs = normalizeParagraphsWithDefaults(payload, WARNING_DISCIPLINARY_LETTER_DEFAULT_PARAGRAPHS);
   for (const paragraph of paragraphs) {
     await drawParagraph(paragraph);
   }
 
-  y -= 2;
-  await drawSimpleLine(payload.closingText || 'Sincerely,', helveticaBold, TYPOGRAPHY.greetingSize);
-  y -= 24;
+  y -= WARNING_DISCIPLINARY_SPACING.closingTopGap;
+  await drawSimpleLine({
+    text: payload.closingText || 'Sincerely,',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
 
   const signatureImage = await loadSignatureImage(
     pdfDoc,
     payload.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL
   );
 
+  let signatureDrawHeight = 0;
   if (signatureImage) {
-    const maxW = 120;
-    const maxH = 42;
-    const ratio = Math.min(maxW / signatureImage.width, maxH / signatureImage.height);
-    const drawW = signatureImage.width * ratio;
-    const drawH = signatureImage.height * ratio;
+    const maxWidth = LETTER_LAYOUT.signatureImage.maxWidth;
+    const maxHeight = LETTER_LAYOUT.signatureImage.maxHeight;
+    const ratio = Math.min(maxWidth / signatureImage.width, maxHeight / signatureImage.height);
+    signatureDrawHeight = signatureImage.height * ratio;
+  }
 
-    await ensureSpace(drawH + 75);
+  const closingLineHeight = TYPOGRAPHY.bodyHighlighted.size + TYPOGRAPHY.body.lineGap;
+  const signatureNameHeight = TYPOGRAPHY.bodyHighlighted.size + TYPOGRAPHY.body.lineGap;
+  const signatureMetaHeight = TYPOGRAPHY.body.size + TYPOGRAPHY.body.lineGap;
+  const signatureLeadGap = 24;
+  const signatureImageGap = signatureDrawHeight ? 4 : 0;
+  const signatureBlockHeight =
+    4 +
+    closingLineHeight +
+    signatureLeadGap +
+    signatureDrawHeight +
+    signatureImageGap +
+    signatureNameHeight +
+    signatureMetaHeight +
+    signatureMetaHeight;
+
+  await ensureSpace(signatureBlockHeight);
+
+  y -= signatureLeadGap;
+
+  if (signatureImage) {
+    const maxWidth = LETTER_LAYOUT.signatureImage.maxWidth;
+    const maxHeight = LETTER_LAYOUT.signatureImage.maxHeight;
+    const ratio = Math.min(maxWidth / signatureImage.width, maxHeight / signatureImage.height);
+    const drawWidth = signatureImage.width * ratio;
+
     page.drawImage(signatureImage, {
       x: leftX,
-      y: y - drawH + 10,
-      width: drawW,
-      height: drawH,
+      y: y - signatureDrawHeight + 10,
+      width: drawWidth,
+      height: signatureDrawHeight,
     });
-    y -= drawH + 8;
-  } else {
-    await ensureSpace(75);
-    y -= 35;
+
+    y -= signatureDrawHeight + 4;
   }
 
-  await drawSimpleLine(
-    payload.signatoryName || 'Authorized Signatory',
-    helveticaBold,
-    TYPOGRAPHY.signatureNameSize
-  );
-  await drawSimpleLine(payload.position || 'Position', helveticaBold, TYPOGRAPHY.signatureMetaSize);
-  await drawSimpleLine(
-    payload.companyName || COMPANY_NAME,
-    helveticaBold,
-    TYPOGRAPHY.signatureMetaSize
-  );
+  await drawSimpleLine({
+    text: payload.signatoryName || 'Sahil Jaiswal',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
+  await drawSimpleLine({
+    text: payload.position || 'CEO & Founder',
+    font: boldFont,
+    size: TYPOGRAPHY.body.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
+  await drawSimpleLine({
+    text: payload.signatoryCompany || companyName,
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
 
-  if (y - 160 > minY) {
-    y -= 120;
+  if (
+    y - WARNING_DISCIPLINARY_SPACING.acknowledgementGapAfterSignBlock >=
+    WARNING_DISCIPLINARY_SPACING.acknowledgementMinStartY
+  ) {
+    y -= WARNING_DISCIPLINARY_SPACING.acknowledgementGapAfterSignBlock;
   } else {
     await newTemplatePage();
+    y = topY - 32;
   }
 
-  await drawSimpleLine(
-    payload.acknowledgementTitle || 'Employee Acknowledgment',
-    helveticaBold,
-    TYPOGRAPHY.greetingSize
-  );
+  await drawSimpleLine({
+    text: payload.acknowledgementTitle || 'Employee Acknowledgment',
+    font: boldFont,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    leftX,
+    lineGap: TYPOGRAPHY.body.lineGap,
+    pageAccess: {
+      getPage: () => page,
+      getY: () => y,
+      setY: (nextY) => {
+        y = nextY;
+      },
+      ensureSpace,
+    },
+  });
   await drawParagraph(
     payload.acknowledgementText ||
-      `I, ${
-        payload.acknowledgementName || '[Employee Full Name]'
-      }, acknowledge receipt of this warning and understand the expectations and potential consequences outlined above.`
+      'I, [Employee Full Name], acknowledge receipt of this warning and understand the expectations and potential consequences outlined above.'
   );
-  y -= 18;
-  await drawSimpleLine(
-    `${payload.signatureLabel || 'Signature'}: _____________________________`,
-    helveticaBold,
-    TYPOGRAPHY.greetingSize
-  );
-  y -= 8;
-  await drawSimpleLine(
-    `${payload.dateLabel || 'Date'}: _____________________________`,
-    helveticaBold,
-    TYPOGRAPHY.greetingSize
-  );
+
+  y -= WARNING_DISCIPLINARY_SPACING.acknowledgementLineTopGap;
+  await ensureSpace(TYPOGRAPHY.bodyHighlighted.size + TYPOGRAPHY.body.lineGap);
+  const signatureLine = `${payload.signatureLabel || 'Signature'}: _____________________________`;
+  const dateLine = `${payload.dateLabel || 'Date'}: _____________________________`;
+
+  page.drawText(signatureLine, {
+    x: leftX,
+    y,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    font: boldFont,
+  });
+  page.drawText(dateLine, {
+    x: rightX - textWidth(boldFont, dateLine, TYPOGRAPHY.bodyHighlighted.size),
+    y,
+    size: TYPOGRAPHY.bodyHighlighted.size,
+    font: boldFont,
+  });
+  y -= TYPOGRAPHY.bodyHighlighted.size + TYPOGRAPHY.body.lineGap;
 
   const bytes = await pdfDoc.save();
   return Buffer.from(bytes);

@@ -43,7 +43,7 @@ const GENERATOR_DOCUMENT_ROUTES = [
   },
   {
     documentType: 'experience-letter',
-    summary: 'Generate experience letter PDF',
+    summary: 'Generate work experience letter PDF',
     exampleName: 'workExperienceLetterPayload',
   },
   {
@@ -63,8 +63,8 @@ const GENERATOR_DOCUMENT_ROUTES = [
   },
   {
     documentType: 'warning-letter',
-    summary: 'Generate warning letter PDF',
-    exampleName: 'warningLetterPayload',
+    summary: 'Generate first warning letter PDF',
+    exampleName: 'firstWarningLetterPayload',
   },
   {
     documentType: 'warning-and-disciplinary-letter',

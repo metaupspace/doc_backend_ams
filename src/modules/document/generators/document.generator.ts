@@ -9,6 +9,9 @@ import { generateInternshipCompletionCertificatePdfBuffer } from './templates/in
 import { generateInternshipToFullTimeLetterPdfBuffer } from './templates/internshipToFullTimeLetter.generator.ts';
 import { generateJoiningLetterPdfBuffer } from './templates/joiningLetter.generator.ts';
 import { generatePromotionLetterPdfBuffer } from './templates/promotionLetter.generator.ts';
+import { generateEmployeeExitFormPdfBuffer } from './templates/employeeExitForm.generator.ts';
+import { generatePerformanceReportPdfBuffer } from './templates/performanceReport.generator.ts';
+import { generatePolicyGeneratorPdfBuffer } from './templates/policyGenerator.generator.ts';
 import { generateProbationCompletionLetterPdfBuffer } from './templates/probationCompletionLetter.generator.ts';
 import { generateProbationOfferLetterPdfBuffer } from './templates/probationOfferLetter.generator.ts';
 import { generateRelievingLetterPdfBuffer } from './templates/relievingLetter.generator.ts';
@@ -145,6 +148,24 @@ export const generatePDFBuffer = async (
 
   if (documentType === 'promotion-letter') {
     return generatePromotionLetterPdfBuffer(payload, {
+      issuedAt: context.issuedAt,
+    });
+  }
+
+  if (documentType === 'employee-exit-form') {
+    return generateEmployeeExitFormPdfBuffer(payload, {
+      issuedAt: context.issuedAt,
+    });
+  }
+
+  if (documentType === 'performance-report') {
+    return generatePerformanceReportPdfBuffer(payload, {
+      issuedAt: context.issuedAt,
+    });
+  }
+
+  if (documentType === 'policy-generator') {
+    return generatePolicyGeneratorPdfBuffer(payload, {
       issuedAt: context.issuedAt,
     });
   }

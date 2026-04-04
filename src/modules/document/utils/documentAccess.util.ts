@@ -4,7 +4,7 @@ export const canCreateDocument = (documentType, roles, { isPerformanceReport }) 
   const normalized = normalizeRoles(roles);
 
   if (isPerformanceReport(documentType)) {
-    return normalized.includes('MANAGER');
+    return normalized.includes('MANAGER') || normalized.includes('HR');
   }
 
   return normalized.includes('HR');

@@ -11,6 +11,9 @@ export { resignationAcceptanceLetterExample } from './resignationAcceptanceLette
 export { warningDisciplinaryLetterExample } from './warningDisciplinaryLetter.example.ts';
 export { workExperienceLetterExample } from './workExperienceLetter.example.ts';
 export { promotionLetterExample } from './promotionLetter.example.ts';
+export { performanceReportExample } from './performanceReport.example.ts';
+export { employeeExitFormExample } from './employeeExitForm.example.ts';
+export { policyGeneratorExample } from './policyGenerator.example.ts';
 export { joiningLetterExample } from './joiningLetter.example.ts';
 export { internshipToFullTimeLetterExample } from './internshipToFullTimeLetter.example.ts';
 export { internshipCompletionCertificateExample } from './internshipCompletionCertificate.example.ts';

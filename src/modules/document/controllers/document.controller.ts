@@ -14,7 +14,7 @@ export const generateDocument = async (req, res, next) => {
         status: 'error',
         message:
           documentType === 'performance-report'
-            ? 'Only MANAGER role can create performance-report'
+            ? 'Only MANAGER or HR role can create performance-report'
             : 'Only HR role can create this document type',
       });
     }

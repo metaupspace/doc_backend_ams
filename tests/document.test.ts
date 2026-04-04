@@ -31,16 +31,53 @@ test('generatePDFBuffer - should create performance-report PDF', async () => {
   assert(pdf.length > 0, 'PDF buffer should be created');
 });
 
-// Test PDF generation for report
-test('validateDocumentRequest - should accept valid offer-letter request', () => {
+test('generatePDFBuffer - should create employee-exit-form PDF', async () => {
   const payload = {
     employeeId: 'emp-1',
-    employeeName: 'John Doe',
-    designation: 'Engineer',
-    joiningDate: '2024-01-15',
+    employeeName: 'Jane Smith',
+    employeeInformation: {
+      fullName: 'Jane Smith',
+      department: 'Engineering',
+    },
+    exitClearanceChecklist: {
+      reportingManager: 'Cleared',
+    },
   };
 
-  const { error, value } = validateDocumentRequest('offer-letter', { payload });
+  const pdf = await generatePDFBuffer('employee-exit-form', payload);
+  assert(pdf.length > 0, 'PDF buffer should be created');
+});
+
+test('generatePDFBuffer - should create policy-generator PDF', async () => {
+  const payload = {
+    annexures: [
+      {
+        annexureId: 'A',
+        title: 'Employment Policies',
+        blocks: [
+          {
+            text: '1. Test policy line for annexure A.',
+          },
+        ],
+      },
+    ],
+  };
+
+  const pdf = await generatePDFBuffer('policy-generator', payload);
+  assert(pdf.length > 0, 'PDF buffer should be created');
+});
+
+// Test PDF generation for report
+test('validateDocumentRequest - should accept valid contractual-letter request', () => {
+  const payload = {
+    employeeName: 'John Doe',
+    paragraphs: ['Paragraph 1', 'Paragraph 2', 'Paragraph 3'],
+    signatureUrl: 'https://example.com/signature.png',
+    signatoryName: 'Sahil Jaiswal',
+    position: 'CEO & Founder',
+  };
+
+  const { error, value } = validateDocumentRequest('contractual-letter', { payload });
   assert(!error, 'Should not have validation errors');
   assert.equal(value.payload.employeeName, 'John Doe');
 });
@@ -74,6 +111,36 @@ test('validateDocumentRequest - should reject missing required spec fields', () 
 
   const { error } = validateDocumentRequest('offer-letter', invalidData);
   assert(error, 'Should have validation errors');
+});
+
+test('validateDocumentRequest - should accept employee-exit-form request', () => {
+  const payload = {
+    employeeId: 'emp-1',
+    employeeName: 'Jane Smith',
+    employeeInformation: {
+      fullName: 'Jane Smith',
+    },
+  };
+
+  const { error, value } = validateDocumentRequest('employee-exit-form', { payload });
+  assert(!error, 'Should not have validation errors');
+  assert.equal(value.payload.employeeName, 'Jane Smith');
+});
+
+test('validateDocumentRequest - should accept policy-generator request', () => {
+  const payload = {
+    annexures: [
+      {
+        annexureId: 'A',
+        title: 'Employment Policies',
+        blocks: [{ text: 'Sample policy content' }],
+      },
+    ],
+  };
+
+  const { error, value } = validateDocumentRequest('policy-generator', { payload });
+  assert(!error, 'Should not have validation errors');
+  assert.equal(value.payload.annexures[0].annexureId, 'A');
 });
 
 // Test health check endpoint

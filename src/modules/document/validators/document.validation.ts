@@ -29,6 +29,7 @@ import {
   DOCUMENT_SPECIFICATIONS,
   DOCUMENT_TYPES,
 } from '../config/document.config.ts';
+import { PERFORMANCE_REPORT_DEFAULT_PAYLOAD } from '../config/performanceReport.config.ts';
 
 const baseDocumentSchema = Joi.object({
   payload: Joi.object().required().messages({
@@ -78,6 +79,17 @@ export const validateDocumentRequest = (documentType, data): any => {
         result.value.payload.paragraphs = normalized;
       }
     }
+  }
+
+  if (documentType === 'performance-report') {
+    const p = result.value.payload;
+    if (!Array.isArray(p.blocks) || p.blocks.length === 0) {
+      p.blocks = JSON.parse(JSON.stringify(PERFORMANCE_REPORT_DEFAULT_PAYLOAD.blocks));
+    }
+    p.title =
+      typeof p.title === 'string' && p.title.trim()
+        ? p.title.trim()
+        : PERFORMANCE_REPORT_DEFAULT_PAYLOAD.title;
   }
 
   if (documentType === 'contractual-letter') {

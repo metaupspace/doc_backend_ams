@@ -12,6 +12,9 @@ import { resignationAcceptanceLetterExample } from './resignationAcceptanceLette
 import { warningDisciplinaryLetterExample } from './warningDisciplinaryLetter.example.ts';
 import { workExperienceLetterExample } from './workExperienceLetter.example.ts';
 import { promotionLetterExample } from './promotionLetter.example.ts';
+import { performanceReportExample } from './performanceReport.example.ts';
+import { employeeExitFormExample } from './employeeExitForm.example.ts';
+import { policyGeneratorExample } from './policyGenerator.example.ts';
 import { joiningLetterExample } from './joiningLetter.example.ts';
 import { internshipToFullTimeLetterExample } from './internshipToFullTimeLetter.example.ts';
 import { internshipCompletionCertificateExample } from './internshipCompletionCertificate.example.ts';
@@ -25,6 +28,9 @@ export const genericExampleForType = (documentType: string) => {
   if (documentType === 'experience-letter') return workExperienceLetterExample;
   if (documentType === 'joining-letter') return joiningLetterExample;
   if (documentType === 'promotion-letter') return promotionLetterExample;
+  if (documentType === 'performance-report') return performanceReportExample;
+  if (documentType === 'employee-exit-form') return employeeExitFormExample;
+  if (documentType === 'policy-generator') return policyGeneratorExample;
   if (documentType === 'letter-of-intent') return letterOfIntentExample;
   if (documentType === 'internship-offer-letter') return internshipOfferLetterExample;
   if (documentType === 'probation-completion-letter') return probationCompletionLetterExample;

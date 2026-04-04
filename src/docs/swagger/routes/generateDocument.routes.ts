@@ -42,6 +42,21 @@ const GENERATOR_DOCUMENT_ROUTES = [
     exampleName: 'promotionLetterPayload',
   },
   {
+    documentType: 'performance-report',
+    summary: 'Generate performance report PDF',
+    exampleName: 'performanceReportPayload',
+  },
+  {
+    documentType: 'employee-exit-form',
+    summary: 'Generate employee exit form PDF',
+    exampleName: 'employeeExitFormPayload',
+  },
+  {
+    documentType: 'policy-generator',
+    summary: 'Generate policy annexure PDF',
+    exampleName: 'policyGeneratorPayload',
+  },
+  {
     documentType: 'experience-letter',
     summary: 'Generate work experience letter PDF',
     exampleName: 'workExperienceLetterPayload',

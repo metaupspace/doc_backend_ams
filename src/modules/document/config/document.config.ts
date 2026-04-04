@@ -121,6 +121,40 @@ export const INTERNSHIP_COMPLETION_CERTIFICATE_DEFAULT_PARAGRAPHS = [
   "This certificate is issued in recognition of the successful completion of the internship and to appreciate the intern's time and contribution during the engagement with MetaUpSpace LLP. We extend our best wishes for continued success in future professional endeavors.",
 ];
 
+export const EMPLOYEE_EXIT_FORM_DEFAULT_DATE_TEXT = '06th July, 2025';
+
+export const EMPLOYEE_EXIT_FORM_DEFAULT_CLEARANCE_STATUSES = {
+  reportingManager: 'Cleared',
+  humanResources: 'Cleared',
+  itAdministration: 'Cleared',
+  financeAccounts: 'Cleared',
+};
+
+export const EMPLOYEE_EXIT_FORM_DEFAULT_PROPERTY_HANDOVER = [
+  { assetDescription: 'Reporting Manager', returned: 'NA', remarks: 'NA' },
+  { assetDescription: 'Laptop / Workstation', returned: 'NA', remarks: 'NA' },
+  { assetDescription: 'Charger / Accessories', returned: 'NA', remarks: 'NA' },
+  { assetDescription: 'Access / ID Card', returned: 'NA', remarks: 'NA' },
+  { assetDescription: 'Any Other Equipment (Specify)', returned: 'NA', remarks: 'NA' },
+];
+
+export const EMPLOYEE_EXIT_FORM_DEFAULT_HANDOVER_CONFIRMATION = [
+  {
+    field: 'Shared Access / Credentials Transferred',
+    selected: 'Yes',
+  },
+  {
+    field: 'Documents/Files Archived and Shared',
+    selected: 'Yes',
+  },
+  {
+    field: 'Client/Team Communication Updated',
+    selected: 'Yes',
+  },
+];
+
+export const EMPLOYEE_EXIT_FORM_DEFAULT_REMARKS = 'All';
+
 export const DOCUMENT_SPECIFICATIONS = {
   'letter-of-intent': {
     title: 'Letter Of Intent',
@@ -251,7 +285,7 @@ export const DOCUMENT_SPECIFICATIONS = {
   },
   'performance-report': {
     title: 'Performance Report',
-    requiredFields: ['employeeId', 'employeeName', 'period', 'rating'],
+    requiredFields: ['employeeId', 'employeeName', 'blocks'],
   },
   'appraisal-letter': {
     title: 'Appraisal Letter',
@@ -327,6 +361,14 @@ export const DOCUMENT_SPECIFICATIONS = {
       'paragraphs',
     ],
   },
+  'employee-exit-form': {
+    title: 'Employee Exit Form',
+    requiredFields: ['employeeId', 'employeeName'],
+  },
+  'policy-generator': {
+    title: 'Policy Generator',
+    requiredFields: ['annexures'],
+  },
 };
 
 export const DOCUMENT_TYPES = Object.keys(DOCUMENT_SPECIFICATIONS);
@@ -336,4 +378,5 @@ export const isPerformanceReport = (documentType) => documentType === 'performan
 export const shouldSkipEmployeeExistenceCheck = (documentType) =>
   documentType === 'contractual-letter' ||
   documentType === 'probation-offer-letter' ||
-  documentType === 'internship-offer-letter';
+  documentType === 'internship-offer-letter' ||
+  documentType === 'policy-generator';

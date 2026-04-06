@@ -26,6 +26,8 @@ import {
   WARNING_LETTER_DEFAULT_PARAGRAPHS,
   PROBATION_OFFER_LETTER_DEFAULT_PARAGRAPHS,
   PROBATION_OFFER_LETTER_DEFAULT_INTRO_PARAGRAPH,
+  OFFER_LETTER_DEFAULT_PARAGRAPHS,
+  OFFER_LETTER_DEFAULT_INTRO_PARAGRAPH,
   DOCUMENT_SPECIFICATIONS,
   DOCUMENT_TYPES,
 } from '../config/document.config.ts';
@@ -189,6 +191,25 @@ export const validateDocumentRequest = (documentType, data): any => {
     p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
     p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
     p.position = p.position || 'CEO & Founder';
+  }
+
+  if (documentType === 'offer-letter') {
+    const p = result.value.payload;
+    const inputParagraphs = Array.isArray(p.paragraphs)
+      ? p.paragraphs.filter(Boolean)
+      : [p.paragraph1, p.paragraph2, p.paragraph3, p.paragraph4].filter(Boolean);
+
+    p.paragraphs = inputParagraphs.length > 0 ? inputParagraphs : [...OFFER_LETTER_DEFAULT_PARAGRAPHS];
+    p.introParagraph = p.introParagraph || OFFER_LETTER_DEFAULT_INTRO_PARAGRAPH;
+    p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
+    p.signatoryName = p.signatoryName || 'Sahil Jaiswal';
+    p.position = p.position || 'CEO & Founder';
+    p.title = p.title || 'OFFER LETTER';
+    p.greeting = p.greeting || `Dear ${p.employeeName || 'Employee Name'},`;
+    p.closingText = p.closingText || 'Warm Regards,';
+    p.companyName = p.companyName || 'MetaUpSpace LLP';
+    p.workSchedule = p.workSchedule || 'Flexible working hours';
+    p.location = p.location || p.workLocation || 'Remote';
   }
 
   if (documentType === 'relieving-letter') {

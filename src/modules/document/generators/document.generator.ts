@@ -14,6 +14,7 @@ import { generatePerformanceReportPdfBuffer } from './templates/performanceRepor
 import { generatePolicyGeneratorPdfBuffer } from './templates/policyGenerator.generator.ts';
 import { generateProbationCompletionLetterPdfBuffer } from './templates/probationCompletionLetter.generator.ts';
 import { generateProbationOfferLetterPdfBuffer } from './templates/probationOfferLetter.generator.ts';
+import { generateOfferLetterPdfBuffer } from './templates/offerLetter.generator.ts';
 import { generateRelievingLetterPdfBuffer } from './templates/relievingLetter.generator.ts';
 import { generateResignationAcceptanceLetterPdfBuffer } from './templates/resignationAcceptanceLetter.generator.ts';
 import { generateTerminationLetterPdfBuffer } from './templates/terminationLetter.generator.ts';
@@ -184,6 +185,12 @@ export const generatePDFBuffer = async (
 
   if (documentType === 'probation-offer-letter') {
     return generateProbationOfferLetterPdfBuffer(payload, {
+      issuedAt: context.issuedAt,
+    });
+  }
+
+  if (documentType === 'offer-letter') {
+    return generateOfferLetterPdfBuffer(payload, {
       issuedAt: context.issuedAt,
     });
   }

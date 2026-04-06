@@ -3,6 +3,7 @@ import { appraisalExample } from './appraisal.example.ts';
 import { contractualLetterExample } from './contractualLetter.example.ts';
 import { letterOfIntentExample } from './letterOfIntent.example.ts';
 import { probationOfferLetterExample } from './probationOfferLetter.example.ts';
+import { offerLetterExample } from './offerLetter.example.ts';
 import { internshipOfferLetterExample } from './internshipOfferLetter.example.ts';
 import { probationCompletionLetterExample } from './probationCompletionLetter.example.ts';
 import { relievingLetterExample } from './relievingLetter.example.ts';
@@ -41,6 +42,7 @@ export const genericExampleForType = (documentType: string) => {
   if (documentType === 'warning-letter') return warningLetterExample;
   if (documentType === 'contractual-letter') return contractualLetterExample;
   if (documentType === 'probation-offer-letter') return probationOfferLetterExample;
+  if (documentType === 'offer-letter') return offerLetterExample;
 
   const requiredFields = DOCUMENT_SPECIFICATIONS[documentType]?.requiredFields || [];
   const payload: Record<string, unknown> = {};

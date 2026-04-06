@@ -2,6 +2,7 @@ export { appraisalExample } from './appraisal.example.ts';
 export { contractualLetterExample } from './contractualLetter.example.ts';
 export { letterOfIntentExample } from './letterOfIntent.example.ts';
 export { probationOfferLetterExample } from './probationOfferLetter.example.ts';
+export { offerLetterExample } from './offerLetter.example.ts';
 export { internshipOfferLetterExample } from './internshipOfferLetter.example.ts';
 export { probationCompletionLetterExample } from './probationCompletionLetter.example.ts';
 export { relievingLetterExample } from './relievingLetter.example.ts';

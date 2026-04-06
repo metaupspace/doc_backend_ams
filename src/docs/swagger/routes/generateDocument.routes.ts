@@ -27,6 +27,11 @@ const GENERATOR_DOCUMENT_ROUTES = [
     exampleName: 'probationOfferLetterPayload',
   },
   {
+    documentType: 'offer-letter',
+    summary: 'Generate offer letter PDF',
+    exampleName: 'offerLetterPayload',
+  },
+  {
     documentType: 'probation-completion-letter',
     summary: 'Generate probation completion letter PDF',
     exampleName: 'probationCompletionLetterPayload',

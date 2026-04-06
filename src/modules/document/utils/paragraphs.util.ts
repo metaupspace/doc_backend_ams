@@ -15,7 +15,7 @@ export const normalizeParagraphsWithDefaults = (
     : [payload?.paragraph1, payload?.paragraph2, payload?.paragraph3].filter(Boolean);
 
   if (inputParagraphs.length > 0) {
-    return [...inputParagraphs, ...defaultParagraphs.slice(inputParagraphs.length)];
+    return [...inputParagraphs];
   }
 
   return [...defaultParagraphs];

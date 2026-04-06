@@ -94,15 +94,17 @@ export const validateDocumentRequest = (documentType, data): any => {
 
   if (documentType === 'contractual-letter') {
     const p = result.value.payload;
+
+    p.jobTitle = p.jobTitle || p.positionTitle || p.designation;
+    p.salaryOrStipend = p.salaryOrStipend || p.compensation || p.stipend;
+    p.endDate = p.endDate || p.contractEndDate;
+
     const inputParagraphs = Array.isArray(p.paragraphs)
       ? p.paragraphs.filter(Boolean)
       : [p.paragraph1, p.paragraph2, p.paragraph3].filter(Boolean);
 
-    const normalizedParagraphs = CONTRACTUAL_LETTER_DEFAULT_PARAGRAPHS.map(
-      (defaultParagraph, index) => inputParagraphs[index] || defaultParagraph
-    );
-
-    p.paragraphs = normalizedParagraphs;
+    p.paragraphs =
+      inputParagraphs.length > 0 ? inputParagraphs : [...CONTRACTUAL_LETTER_DEFAULT_PARAGRAPHS];
     p.signatureUrl = p.signatureUrl || CONTRACTUAL_LETTER_DEFAULT_SIGNATURE_URL;
   }
 

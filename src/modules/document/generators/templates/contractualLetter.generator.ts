@@ -18,6 +18,20 @@ import { drawBulletLabelValue, drawSimpleLine } from '../../utils/pdfLineLayout.
 
 const SECTION_SPACING = 8;
 
+const resolveContractualPlaceholders = (text, payload) => {
+  const positionTitle =
+    payload.positionTitle || payload.jobTitle || payload.designation || 'the stated role';
+  const startDate = payload.startDate || 'the stated start date';
+  const endDate = payload.endDate || payload.contractEndDate || 'the stated end date';
+  const companyName = payload.companyName || COMPANY_NAME;
+
+  return String(text || '')
+    .replaceAll('[Position Title]', String(positionTitle))
+    .replaceAll('[Start Date]', String(startDate))
+    .replaceAll('[End Date]', String(endDate))
+    .replaceAll('[Company Name]', String(companyName));
+};
+
 export const generateContractualLetterPdfBuffer = async (
   payload,
   { issuedAt } = { issuedAt: undefined }
@@ -145,7 +159,9 @@ export const generateContractualLetterPdfBuffer = async (
   });
 
   const introParagraph =
-    typeof payload.introParagraph === 'string' ? payload.introParagraph.trim() : '';
+    typeof payload.introParagraph === 'string'
+      ? resolveContractualPlaceholders(payload.introParagraph.trim(), payload)
+      : '';
   if (introParagraph) {
     await drawParagraph(introParagraph);
   }
@@ -168,16 +184,17 @@ export const generateContractualLetterPdfBuffer = async (
   y -= 2;
 
   const keyTerms = [
-    { label: 'Position Title', value: payload.jobTitle },
+    { label: 'Position Title', value: payload.jobTitle || payload.positionTitle || payload.designation },
     { label: 'Department', value: payload.department },
     { label: 'Reporting Manager', value: payload.reportingManager },
     { label: 'Start Date', value: payload.startDate },
-    { label: 'End Date', value: payload.endDate },
+    { label: 'End Date', value: payload.endDate || payload.contractEndDate },
+    { label: 'Contract Duration', value: payload.contractDuration },
     {
       label: 'Employment Type',
       value: payload.employmentType || 'Fixed-Term Contractual',
     },
-    { label: 'Salary / Stipend', value: payload.salaryOrStipend },
+    { label: 'Salary / Stipend', value: payload.salaryOrStipend || payload.compensation || payload.stipend },
     { label: 'Work Location', value: payload.workLocation || 'Remote' },
     { label: 'Acceptance Deadline', value: payload.acceptanceDeadline },
   ];
@@ -212,11 +229,13 @@ export const generateContractualLetterPdfBuffer = async (
 
   const paragraphs = normalizeParagraphsWithDefaults(payload, CONTRACTUAL_LETTER_DEFAULT_PARAGRAPHS);
   for (const paragraph of paragraphs) {
-    await drawParagraph(paragraph);
+    await drawParagraph(resolveContractualPlaceholders(paragraph, payload));
   }
 
   const contactParagraph =
-    typeof payload.contactParagraph === 'string' ? payload.contactParagraph.trim() : '';
+    typeof payload.contactParagraph === 'string'
+      ? resolveContractualPlaceholders(payload.contactParagraph.trim(), payload)
+      : '';
   if (contactParagraph) {
     await drawParagraph(contactParagraph);
   }

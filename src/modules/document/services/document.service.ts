@@ -75,8 +75,9 @@ export const createAndGenerateDocument = async ({
   });
 
   try {
+    const issuedAt = payload?.issueDate || documentRecord.createdAt;
     const pdfBuffer = await generatePDFBuffer(documentType, payload, {
-      issuedAt: documentRecord.createdAt,
+      issuedAt,
     });
     const generationTime = Date.now() - startTime;
     const documentIdentifier = buildDocumentIdentifier({
@@ -179,7 +180,7 @@ export const getDocumentPdfById = async ({ id, requester }) => {
     documentRecord.documentType,
     documentRecord.payload || {},
     {
-      issuedAt: documentRecord.createdAt,
+      issuedAt: documentRecord.payload?.issueDate || documentRecord.createdAt,
     }
   );
 

@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import app from '../src/app.ts';
 import { generatePDFBuffer } from '../src/modules/document/generators/document.generator.ts';
 import { validateDocumentRequest } from '../src/modules/document/validators/document.validation.ts';
+import {
+  normalizeParagraphList,
+  normalizeParagraphsWithDefaults,
+} from '../src/modules/document/utils/paragraphs.util.ts';
 
 // Test PDF generation for invoice
 test('generatePDFBuffer - should create offer-letter PDF', async () => {
@@ -82,6 +86,38 @@ test('validateDocumentRequest - should accept valid contractual-letter request',
   assert.equal(value.payload.employeeName, 'John Doe');
 });
 
+test('validateDocumentRequest - contractual-letter should keep all custom paragraphs', () => {
+  const payload = {
+    employeeName: 'Harshit Saini',
+    paragraphs: ['P1', 'P2', 'P3', 'P4', 'P5'],
+    signatoryName: 'Sahil Jaiswal',
+    position: 'CEO & Founder',
+  };
+
+  const { error, value } = validateDocumentRequest('contractual-letter', { payload });
+  assert(!error, 'Should not have validation errors');
+  assert.equal(value.payload.paragraphs.length, 5);
+  assert.equal(value.payload.paragraphs[4], 'P5');
+});
+
+test('validateDocumentRequest - contractual-letter should map alias fields', () => {
+  const payload = {
+    employeeName: 'Harshit Saini',
+    positionTitle: 'ASE',
+    compensation: '5000',
+    contractEndDate: '5 April 2027',
+    paragraphs: ['P1'],
+    signatoryName: 'Sahil Jaiswal',
+    position: 'CEO & Founder',
+  };
+
+  const { error, value } = validateDocumentRequest('contractual-letter', { payload });
+  assert(!error, 'Should not have validation errors');
+  assert.equal(value.payload.jobTitle, 'ASE');
+  assert.equal(value.payload.salaryOrStipend, '5000');
+  assert.equal(value.payload.endDate, '5 April 2027');
+});
+
 // Test validation - invalid document type
 test('validateDocumentRequest - should reject invalid document type', () => {
   const invalidData = {
@@ -141,6 +177,38 @@ test('validateDocumentRequest - should accept policy-generator request', () => {
   const { error, value } = validateDocumentRequest('policy-generator', { payload });
   assert(!error, 'Should not have validation errors');
   assert.equal(value.payload.annexures[0].annexureId, 'A');
+});
+
+test('normalizeParagraphList - should keep all provided paragraphs', () => {
+  const paragraphs = Array.from({ length: 44 }, (_, index) => `Paragraph ${index + 1}`);
+
+  const normalized = normalizeParagraphList({ paragraphs });
+
+  assert.equal(normalized.length, 44);
+  assert.equal(normalized[43], 'Paragraph 44');
+});
+
+test('normalizeParagraphsWithDefaults - should use only provided paragraphs', () => {
+  const paragraphs = ['Paragraph 1'];
+
+  const normalized = normalizeParagraphsWithDefaults(
+    { paragraphs },
+    ['Default 1', 'Default 2', 'Default 3']
+  );
+
+  assert.equal(normalized.length, 1);
+  assert.equal(normalized[0], 'Paragraph 1');
+});
+
+test('normalizeParagraphsWithDefaults - should use defaults when input is missing', () => {
+  const normalized = normalizeParagraphsWithDefaults(
+    {},
+    ['Default 1', 'Default 2', 'Default 3']
+  );
+
+  assert.equal(normalized.length, 3);
+  assert.equal(normalized[0], 'Default 1');
+  assert.equal(normalized[2], 'Default 3');
 });
 
 // Test health check endpoint

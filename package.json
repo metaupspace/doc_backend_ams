@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Production-ready document generation service with JWT token validation and PDF streaming",
   "type": "module",
-  "main": "dist/server.ts",
+  "main": "dist/server.js",
   "scripts": {
-    "build": "npm run typecheck && tsup",
-    "start": "node dist/server.ts",
+    "build": "npm run typecheck && node ./node_modules/tsup/dist/cli-default.js",
+    "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "test": "tsx --test tests/**/*.test.ts",
     "lint": "eslint . --ext .ts",

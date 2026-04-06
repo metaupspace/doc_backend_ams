@@ -2,6 +2,23 @@ import { PERFORMANCE_REPORT_DEFAULT_PAYLOAD } from '../../../modules/document/co
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
+const getCellText = (cell: unknown): string | undefined => {
+  if (typeof cell === 'string') {
+    return cell;
+  }
+
+  if (cell && typeof cell === 'object' && 'text' in cell) {
+    const value = (cell as { text?: unknown }).text;
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  return undefined;
+};
+
+const isTableBlock = (block: unknown): block is { type: 'table'; rows: Array<{ cells?: unknown[] }> } =>
+  !!block && typeof block === 'object' && (block as { type?: string }).type === 'table' &&
+  Array.isArray((block as { rows?: unknown[] }).rows);
+
 const payload = {
   employeeId: 'HR-0001',
   employeeName: 'Mohammed Shanawaz',
@@ -89,14 +106,13 @@ if (Array.isArray(payload.blocks)) {
 
   const acknowledgementTable = payload.blocks.find(
     (block) =>
-      block?.type === 'table' &&
-      Array.isArray(block?.rows) &&
-      block.rows.some((row) => Array.isArray(row?.cells) && row.cells[0]?.text === 'Signature')
+      isTableBlock(block) &&
+      block.rows.some((row) => Array.isArray(row?.cells) && getCellText(row.cells[0]) === 'Signature')
   );
 
-  if (acknowledgementTable && Array.isArray(acknowledgementTable.rows)) {
+  if (isTableBlock(acknowledgementTable)) {
     const signatureRow = acknowledgementTable.rows.find(
-      (row) => Array.isArray(row?.cells) && row.cells[0]?.text === 'Signature'
+      (row) => Array.isArray(row?.cells) && getCellText(row.cells[0]) === 'Signature'
     );
 
     if (signatureRow && Array.isArray(signatureRow.cells) && signatureRow.cells.length >= 4) {

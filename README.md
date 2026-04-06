@@ -34,6 +34,44 @@ Production-ready document generation service built with Node.ts, Express, MongoD
    - Development: `npm run dev`
    - Production: `npm start`
 
+## Docker
+
+### Run with Docker Compose (API only, Atlas MongoDB)
+
+Prerequisite: set `DATABASE_URL` in your `.env` to your MongoDB Atlas connection string.
+
+1. Build and start containers:
+  ```bash
+  docker compose up --build -d
+  ```
+
+2. Open API:
+  - App: `http://localhost:3000`
+  - Health: `http://localhost:3000/health`
+  - Swagger UI: `http://localhost:3000/api-docs`
+
+3. Stop containers:
+  ```bash
+  docker compose down
+  ```
+
+4. Stop containers:
+  ```bash
+  docker compose down
+  ```
+
+### Run container without Compose
+
+```bash
+docker build -t ams-doc-backend .
+docker run --rm -p 3000:3000 \
+  -e PORT=3000 \
+  -e NODE_ENV=production \
+  -e DATABASE_URL='mongodb://host.docker.internal:27017/doc-gen-service' \
+  -e JWT_SECRET='replace-with-a-strong-random-secret-at-least-32-chars' \
+  ams-doc-backend
+```
+
 ## API Usage
 
 ### Generate Document

@@ -114,7 +114,7 @@ export const generateAppraisalLetterPdfBuffer = async (
   });
   y -= 26;
 
-  const paragraphs = normalizeParagraphList(payload, 3);
+  const paragraphs = normalizeParagraphList(payload);
   for (const paragraph of paragraphs) {
     await drawParagraph(paragraph, helvetica, 11, TYPOGRAPHY.body.lineGap);
   }

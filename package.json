@@ -35,6 +35,7 @@
     "jsonwebtoken": "^9.0.0",
     "mongodb": "^5.7.0",
     "mongoose": "^7.4.0",
+    "node-fetch": "^3.3.2",
     "pdf-lib": "^1.17.1",
     "pdfkit": "^0.13.0",
     "swagger-jsdoc": "^6.2.8",

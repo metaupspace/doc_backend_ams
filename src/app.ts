@@ -11,6 +11,7 @@ import swaggerSpec from './config/swagger.ts';
 import { corsOrigins, enableApiDocs, exposeOpenApiSpec, nodeEnv } from './config/env.ts';
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Security & Performance Middleware
 app.use(helmet()); // Security headers

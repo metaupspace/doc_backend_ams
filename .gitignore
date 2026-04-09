@@ -7,3 +7,6 @@ logs/
 .DS_Store
 
 config.bat
+
+# Environment files
+!.env.example

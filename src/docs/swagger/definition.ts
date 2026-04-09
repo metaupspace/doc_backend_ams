@@ -11,6 +11,14 @@ export const swaggerDefinition = {
   },
   servers: [
     {
+      url: 'https://docbackendams-production.up.railway.app',
+      description: 'Production (Railway)',
+    },
+    // {
+    //   url: 'https://',
+    //   description: 'Production (Railway) -- Official Domain',
+    // },
+    {
       url: 'http://localhost:3000',
       description: 'Local development',
     },

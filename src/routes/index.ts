@@ -8,4 +8,5 @@ const router = Router();
  */
 router.use('/v1/documents', documentRoutes);
 
+
 export default router;

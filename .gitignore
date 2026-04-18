@@ -9,4 +9,6 @@ logs/
 config.bat
 
 # Environment files
+.env
+.env.*
 !.env.example

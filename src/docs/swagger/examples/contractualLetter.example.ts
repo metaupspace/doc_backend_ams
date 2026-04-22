@@ -24,4 +24,5 @@ export const contractualLetterExample = {
     signatoryName: 'Sahil Jaiswal',
     position: 'CEO & Founder',
   },
+  
 };

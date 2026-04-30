@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, StandardFonts, degrees, rgb } from 'pdf-lib';
 import { LETTER_LAYOUT } from '../../config/letterLayout.config.ts';
 import {
   PERFORMANCE_REPORT_DEFAULT_PAYLOAD,
@@ -10,7 +10,7 @@ import {
   type PerformanceReportTableRow,
 } from '../../config/performanceReport.config.ts';
 import { TYPOGRAPHY } from '../../config/typography.config.ts';
-import { embedDMSansFonts } from '../../utils/fontLoader.util.ts';
+import { embedDMSansFonts, loadBilboSwashCapsFont } from '../../utils/fontLoader.util.ts';
 import { loadSignatureImage } from '../../utils/loadSignatureImage.util.ts';
 
 const BORDER = rgb(0, 0, 0);
@@ -22,6 +22,9 @@ type NormalizedCell = {
   text: string;
   bold: boolean;
   align: 'left' | 'center' | 'right';
+  fontStyle: 'normal' | 'signature';
+  disclaimerText?: string;
+  disclaimerSize?: number;
   kind: 'text' | 'checkbox' | 'image';
   checked: boolean;
   imageUrl?: string;
@@ -30,6 +33,38 @@ type NormalizedCell = {
 };
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+
+const ISO_TIMESTAMP_REGEX =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})?$/;
+
+const formatTimestampToIst = (input: string) => {
+  if (!ISO_TIMESTAMP_REGEX.test(input)) return input;
+
+  const parsed = new Date(input);
+  if (Number.isNaN(parsed.getTime())) return input;
+
+  const parts = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).formatToParts(parsed);
+
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const day = map.day || '';
+  const month = map.month || '';
+  const year = map.year || '';
+  const hour = map.hour || '';
+  const minute = map.minute || '';
+  const dayPeriod = String(map.dayPeriod || '').toUpperCase();
+
+  return `${day} ${month} ${year} | ${hour}:${minute} ${dayPeriod} IST`.replace(/\s+/g, ' ').trim();
+};
+
+const normalizeTimestampIfPossible = (value: string) => formatTimestampToIst(String(value || '').trim());
 
 const wrapText = (font, text: string, size: number, maxWidth: number) => {
   const lines: string[] = [];
@@ -86,6 +121,7 @@ const normalizeCell = (cell: PerformanceReportCell): NormalizedCell => {
       text: cell,
       bold: false,
       align: 'left',
+      fontStyle: 'normal',
       kind: 'text',
       checked: false,
       colSpan: 1,
@@ -99,6 +135,15 @@ const normalizeCell = (cell: PerformanceReportCell): NormalizedCell => {
       cell?.align === 'center' || cell?.align === 'right' || cell?.align === 'left'
         ? cell.align
         : 'left',
+    fontStyle: cell?.fontStyle === 'signature' ? 'signature' : 'normal',
+    disclaimerText:
+      typeof cell?.disclaimerText === 'string' && cell.disclaimerText.trim()
+        ? cell.disclaimerText.trim()
+        : undefined,
+    disclaimerSize:
+      typeof cell?.disclaimerSize === 'number' && Number.isFinite(cell.disclaimerSize)
+        ? cell.disclaimerSize
+        : undefined,
     kind: cell?.kind === 'checkbox' || cell?.kind === 'image' ? cell.kind : 'text',
     checked: Boolean(cell?.checked),
     imageUrl: typeof cell?.imageUrl === 'string' ? cell.imageUrl : undefined,
@@ -193,6 +238,14 @@ export const generatePerformanceReportPdfBuffer = async (
   const fonts = await embedDMSansFonts(pdfDoc);
   const regular = fonts.regular;
   const bold = fonts.bold;
+  const italic = fonts.italic;
+  let signature;
+  try {
+    const bilboBuffer = await loadBilboSwashCapsFont();
+    signature = await pdfDoc.embedFont(bilboBuffer);
+  } catch {
+    signature = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
+  }
 
   const pageWidth = page.getWidth();
   const topY = page.getHeight() - LETTER_LAYOUT.topOffset - 12;
@@ -293,6 +346,8 @@ export const generatePerformanceReportPdfBuffer = async (
       }
 
       const baseSize = TYPOGRAPHY.bodyHighlighted.size + 1;
+      const firstCellLabel = (effectiveCells[0]?.text || '').trim().toLowerCase();
+      const isDateRow = firstCellLabel === 'date';
       let rowHeight = Math.max(28, row.minHeight || 0);
       for (const cell of effectiveCells) {
         if (cell.kind === 'checkbox') {
@@ -305,11 +360,25 @@ export const generatePerformanceReportPdfBuffer = async (
           continue;
         }
 
-        const cellSize = cell.size || baseSize;
-        const font = cell.bold || row.header ? bold : regular;
+        const computedCellSize = cell.size || baseSize;
+        const cellSize = isDateRow ? Math.max(8, computedCellSize - 1) : computedCellSize;
+        const font =
+          cell.fontStyle === 'signature' ? signature : cell.bold || row.header ? bold : regular;
         const lines = wrapText(font, cell.text, cellSize, Math.max(10, cell.width - CELL_PADDING_X * 2));
         const needed = lines.length * (cellSize + 4) + CELL_PADDING_Y * 2;
-        rowHeight = Math.max(rowHeight, needed);
+        let requiredHeight = needed;
+        if (cell.fontStyle === 'signature' && cell.disclaimerText) {
+          const disclaimerSize = cell.disclaimerSize || 4;
+          const disclaimerLines = wrapText(
+            regular,
+            cell.disclaimerText,
+            disclaimerSize,
+            Math.max(10, cell.width - CELL_PADDING_X * 2)
+          );
+          const disclaimerHeight = disclaimerLines.length * (disclaimerSize + 2);
+          requiredHeight = Math.max(requiredHeight, cellSize + disclaimerHeight + 20);
+        }
+        rowHeight = Math.max(rowHeight, requiredHeight);
       }
 
       await ensureSpace(rowHeight + 2);
@@ -350,9 +419,82 @@ export const generatePerformanceReportPdfBuffer = async (
           continue;
         }
 
-        const cellSize = cell.size || baseSize;
-        const font = cell.bold || row.header ? bold : regular;
-        const lines = wrapText(font, cell.text, cellSize, Math.max(10, cell.width - CELL_PADDING_X * 2));
+        const computedCellSize = cell.size || baseSize;
+        const cellSize = isDateRow ? Math.max(8, computedCellSize - 1) : computedCellSize;
+        const font =
+          cell.fontStyle === 'signature' ? signature : cell.bold || row.header ? bold : regular;
+
+        if (cell.fontStyle === 'signature') {
+          const rawLines = String(cell.text || '')
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+
+          const signatureLine = rawLines[0] || '';
+          const legacyDisclaimerLine = rawLines.find((line) => /system generated/i.test(line));
+          const rawDisclaimer = cell.disclaimerText || legacyDisclaimerLine;
+          const disclaimerLine = rawDisclaimer
+            ? '* AMS generated signature'
+            : undefined;
+
+          if (signatureLine) {
+            const drawSize = Math.max(12, Math.floor(Math.max(cellSize, 28) * 0.75));
+            const signatureLines = wrapText(
+              font,
+              signatureLine,
+              drawSize,
+              Math.max(10, cell.width - CELL_PADDING_X * 2 - 14)
+            );
+            let textY = y - rowHeight * 0.70;
+
+            for (const line of signatureLines) {
+              const lineWidth = font.widthOfTextAtSize(line, drawSize);
+              const textX = x + (cell.width - lineWidth) / 2;
+              page.drawText(line, {
+                x: textX,
+                y: textY,
+                size: drawSize,
+                font,
+                rotate: degrees(17),
+              });
+              textY -= drawSize + 2;
+            }
+          }
+
+          if (disclaimerLine) {
+            const disclaimerSize = cell.disclaimerSize || 8;
+            const disclaimerLines = wrapText(
+              regular,
+              disclaimerLine,
+              disclaimerSize,
+              Math.max(10, cell.width - CELL_PADDING_X * 2)
+            );
+            const disclaimerLineHeight = disclaimerSize + 2;
+            let disclaimerY = y - rowHeight + 4 + disclaimerLineHeight * (disclaimerLines.length - 1);
+
+            for (const disclaimerText of disclaimerLines) {
+              const lineWidth = italic.widthOfTextAtSize(disclaimerText, disclaimerSize);
+              const disclaimerX = x + (cell.width - lineWidth) / 2;
+              page.drawText(disclaimerText, {
+                x: disclaimerX,
+                y: disclaimerY,
+                size: disclaimerSize,
+                font: italic,
+              });
+              disclaimerY -= disclaimerLineHeight;
+            }
+          }
+
+          continue;
+        }
+
+        const normalizedCellText = normalizeTimestampIfPossible(cell.text);
+        const lines = wrapText(
+          font,
+          normalizedCellText,
+          cellSize,
+          Math.max(10, cell.width - CELL_PADDING_X * 2)
+        );
         const lineHeight = cellSize + 4;
         const contentHeight = lines.length * lineHeight;
         let textY = y - ((rowHeight - contentHeight) / 2) - cellSize + 2;

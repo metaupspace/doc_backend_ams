@@ -47,6 +47,13 @@ export const findDocuments = async ({ filters, search, page, limit }) => {
               hrName: 1,
               managerId: 1,
               status: 1,
+              approvalStatus: 1,
+              approvalStatusHistory: 1,
+              submittedToHrAt: 1,
+              hrReviewedAt: 1,
+              sentToEmployeeAt: 1,
+              employeeAcknowledgedAt: 1,
+              lockedAt: 1,
               fileName: 1,
               fileSize: 1,
               generationTime: 1,
@@ -107,6 +114,46 @@ export const findActiveEmployeeByEmployeeId = async (employeeId) => {
     const employee = await mongoose.connection.db.collection(collectionName).findOne({
       employeeId,
       active: { $ne: false },
+    });
+
+    if (employee) {
+      return employee;
+    }
+  }
+
+  return null;
+};
+
+export const findActiveEmployeeByEmail = async (email) => {
+  if (!email || !mongoose.connection?.db) {
+    return null;
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const emailRegex = new RegExp(`^${escapeRegex(normalizedEmail)}$`, 'i');
+  const emailFilters = [
+    { email: normalizedEmail },
+    { email: emailRegex },
+    { emailId: normalizedEmail },
+    { emailId: emailRegex },
+    { workEmail: normalizedEmail },
+    { workEmail: emailRegex },
+    { officialEmail: normalizedEmail },
+    { officialEmail: emailRegex },
+    { companyEmail: normalizedEmail },
+    { companyEmail: emailRegex },
+    { personalEmail: normalizedEmail },
+    { personalEmail: emailRegex },
+  ];
+
+  for (const collectionName of EMPLOYEE_COLLECTIONS) {
+    const employee = await mongoose.connection.db.collection(collectionName).findOne({
+      active: { $ne: false },
+      $or: emailFilters,
     });
 
     if (employee) {

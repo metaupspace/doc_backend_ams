@@ -49,6 +49,36 @@ export const loadDMSansFont = async (variant: string = 'Regular'): Promise<Buffe
 };
 
 /**
+ * Load Bilbo Swash Caps signature font from file system.
+ */
+export const loadBilboSwashCapsFont = async (): Promise<Buffer> => {
+  const cacheKey = 'BilboSwashCaps-Regular';
+
+  const cached = fontCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const fontPath = path.join(
+      process.cwd(),
+      'public',
+      'fonts',
+      'Bilbo_Swash_Caps',
+      'BilboSwashCaps-Regular.ttf'
+    );
+
+    const fontBuffer = await fs.readFile(fontPath);
+    fontCache.set(cacheKey, fontBuffer);
+    return fontBuffer;
+  } catch {
+    throw new Error(
+      'Failed to load Bilbo Swash Caps font. Ensure font exists at ./public/fonts/Bilbo_Swash_Caps/'
+    );
+  }
+};
+
+/**
  * Embed DM Sans fonts into PDF document
  * @param pdfDoc - PDF document instance
  * @returns Object with embedded font references

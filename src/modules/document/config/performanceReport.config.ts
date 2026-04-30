@@ -9,6 +9,9 @@ export type PerformanceReportCell =
       imageUrl?: string;
       colSpan?: number;
       size?: number;
+      fontStyle?: 'normal' | 'signature';
+      disclaimerText?: string;
+      disclaimerSize?: number;
     };
 
 export type PerformanceReportTableRow = {
@@ -418,19 +421,11 @@ export const PERFORMANCE_REPORT_DEFAULT_PAYLOAD: PerformanceReportPayload = {
               imageUrl:
                 'https://res.cloudinary.com/dkstzpumx/image/upload/q_auto/f_auto/v1775112240/sign_1_rzfa4e.jpg',
             },
-            {
-              kind: 'image',
-              imageUrl:
-                'https://res.cloudinary.com/dkstzpumx/image/upload/q_auto/f_auto/v1775112240/sign_1_rzfa4e.jpg',
-            },
-            {
-              kind: 'image',
-              imageUrl:
-                'https://res.cloudinary.com/dkstzpumx/image/upload/q_auto/f_auto/v1775112240/sign_1_rzfa4e.jpg',
-            },
+            '',
+            '',
           ],
         },
-        { cells: [{ text: 'Date', bold: true }, '17 September 2025', '17 September 2025', '17 September 2025'] },
+        { cells: [{ text: 'Date', bold: true }, '17 September 2025', '', ''] },
       ],
     },
     { type: 'spacer', height: 8 },

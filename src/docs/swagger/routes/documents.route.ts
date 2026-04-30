@@ -8,6 +8,21 @@ export const documentsPath = {
       security: [{ bearerAuth: [] }],
       parameters: [
         { name: 'documentType', in: 'query', schema: { type: 'string', enum: DOCUMENT_TYPES } },
+        {
+          name: 'approvalStatus',
+          in: 'query',
+          schema: {
+            type: 'string',
+            enum: [
+              'draft',
+              'submitted_to_hr',
+              'approved_by_hr',
+              'rejected_by_hr',
+              'sent_to_employee',
+              'acknowledged_by_employee',
+            ],
+          },
+        },
         { name: 'search', in: 'query', schema: { type: 'string', maxLength: 100 } },
         { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
         {
@@ -30,6 +45,35 @@ export const documentsPath = {
   },
 
   '/api/v1/documents/{id}': {
+    get: {
+      tags: ['Documents'],
+      summary: 'Fetch one document details by id',
+      security: [{ bearerAuth: [] }],
+      parameters: [
+        {
+          name: 'id',
+          in: 'path',
+          required: true,
+          schema: { type: 'string' },
+        },
+      ],
+      responses: {
+        200: {
+          description: 'Document details response',
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/SuccessResponse' },
+            },
+          },
+        },
+        404: {
+          description: 'Document not found',
+        },
+      },
+    },
+  },
+
+  '/api/v1/documents/{id}/pdf': {
     get: {
       tags: ['Documents'],
       summary: 'Fetch one document PDF by id',

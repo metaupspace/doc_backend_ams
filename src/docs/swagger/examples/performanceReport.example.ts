@@ -121,16 +121,8 @@ if (Array.isArray(payload.blocks)) {
         imageUrl:
           'https://res.cloudinary.com/dkstzpumx/image/upload/q_auto/f_auto/v1775112240/sign_1_rzfa4e.jpg',
       };
-      signatureRow.cells[2] = {
-        kind: 'image',
-        imageUrl:
-          'https://res.cloudinary.com/dkstzpumx/image/upload/q_auto/f_auto/v1775112240/sign_1_rzfa4e.jpg',
-      };
-      signatureRow.cells[3] = {
-        kind: 'image',
-        imageUrl:
-          'https://res.cloudinary.com/dkstzpumx/image/upload/q_auto/f_auto/v1775112240/sign_1_rzfa4e.jpg',
-      };
+      signatureRow.cells[2] = '';
+      signatureRow.cells[3] = '';
     }
   }
 }

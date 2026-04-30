@@ -1,5 +1,6 @@
 import logger from '../config/logger.ts';
 import { jwtUtils } from '../utils/jwtUtils.ts';
+import * as documentRepository from '../modules/document/repositories/document.repository.ts';
 
 /**
  * List of public endpoints that don't require authentication
@@ -21,7 +22,7 @@ const isPublicRoute = (path) => {
  * Validates Bearer token similar to Spring Boot JwtAuthenticationFilter
  * Attached user info to request if valid
  */
-export const validateToken = (req, res, next) => {
+export const validateToken = async (req, res, next) => {
   try {
     // Skip if public route
     if (isPublicRoute(req.path)) {
@@ -106,7 +107,35 @@ export const validateToken = (req, res, next) => {
     const decoded = jwtUtils.decodeJwtToken(token);
     const userDetails = jwtUtils.extractUserDetails(decoded);
 
+    if (!userDetails.employeeId && userDetails.email) {
+      const employeeRecord = await documentRepository.findActiveEmployeeByEmail(userDetails.email);
+
+      if (employeeRecord?.employeeId) {
+        userDetails.employeeId = employeeRecord.employeeId;
+      }
+
+      logger.info('Resolved employee from email lookup', {
+        userId: userDetails.id,
+        email: userDetails.email,
+        resolvedEmployeeId: userDetails.employeeId || null,
+        employeeRecordFound: Boolean(employeeRecord),
+        path: req.path,
+        method: req.method,
+      });
+    }
+
     req.user = userDetails;
+
+    logger.info('JWT user extracted', {
+      userId: userDetails.id,
+      employeeId: userDetails.employeeId,
+      empIdClaim: decoded?.empId || null,
+      employeeIdClaim: decoded?.employeeId || null,
+      employeeIDClaim: decoded?.employeeID || null,
+      roles: userDetails.roles,
+      path: req.path,
+      method: req.method,
+    });
 
     logger.debug('JWT token validated', {
       userId: userDetails.id,

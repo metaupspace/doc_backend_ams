@@ -72,6 +72,8 @@ export const jwtUtils = {
   extractUserDetails: (decoded) => {
     return {
       id: decoded.id || decoded.userId || decoded.sub,
+      userId: decoded.id,
+      employeeId: decoded.empId || decoded.employeeId || decoded.employeeID || null,
       email: decoded.email,
       roles: decoded.roles || decoded.role || [],
       iat: decoded.iat,

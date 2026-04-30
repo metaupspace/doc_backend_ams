@@ -1,4 +1,9 @@
-import { healthPath, generateDocumentPaths, documentsPath } from './routes/index.ts';
+import {
+  healthPath,
+  generateDocumentPaths,
+  documentsPath,
+  performanceReportWorkflowPaths,
+} from './routes/index.ts';
 import { swaggerComponents } from './components.ts';
 
 export const swaggerDefinition = {
@@ -28,5 +33,6 @@ export const swaggerDefinition = {
     ...healthPath,
     ...generateDocumentPaths,
     ...documentsPath,
+    ...performanceReportWorkflowPaths,
   },
 };
